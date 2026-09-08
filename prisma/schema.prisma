@@ -1,0 +1,628 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  musician
+  venue
+  admin
+}
+
+enum BookingStatus {
+  pending
+  accepted
+  declined
+  completed
+  cancelled
+}
+enum BookingSource {
+  direct_request
+  job_application
+  manual
+}
+
+enum PaymentStatus {
+  pending
+  authorized
+  paid
+  failed
+  refunded
+  cancelled
+}
+
+enum PayoutStatus {
+  pending
+  scheduled
+  paid
+  failed
+  cancelled
+}
+
+enum JobListingStatus {
+  draft
+  published
+  paused
+  closed
+  filled
+  expired
+}
+
+enum JobApplicationStatus {
+  submitted
+  shortlisted
+  declined
+  accepted
+  withdrawn
+}
+
+enum PromotionPlacement {
+  talent_search
+  job_listing
+  homepage_featured
+  category_search
+}
+
+enum PromotionBillingModel {
+  time_based
+  view_based
+}
+
+enum PromotionStatus {
+  draft
+  scheduled
+  active
+  paused
+  completed
+  cancelled
+}
+
+enum AnalyticsEventType {
+  profile_view
+  search_impression
+  search_click
+  booking_request
+  booking_accept
+  booking_complete
+  job_view
+  job_apply
+  promotion_view
+  promotion_click
+}
+
+enum MusicSource {
+  manual
+  spotify
+  apple_music
+}
+
+enum AuditLogLevel {
+  debug
+  info
+  warn
+  error
+  critical
+}
+
+enum AuditEventCategory {
+  auth
+  authorization
+  profile
+  booking
+  billing
+  payment
+  job
+  promotion
+  analytics
+  integration
+  system
+  admin
+}
+
+model User {
+  id               String    @id @default(cuid())
+  name             String?
+  email            String    @unique
+  emailVerified    DateTime?
+  passwordHash     String?
+  image            String?
+  role             UserRole  @default(musician)
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+
+  musicianProfile MusicianProfile?
+  venueProfile    VenueProfile?
+  accounts        Account[]
+  sessions        Session[]
+  reviews         Review[]
+  auditLogs       AuditLog[] @relation("ActorAuditLogs")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([expires])
+}
+
+model MusicianProfile {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  stageName       String
+  bio             String  @default("") @db.Text
+  experienceYears Int     @default(0)
+  location        String  @default("")
+  profileImage    String?
+  bannerImage     String?
+  rating          Float   @default(0)
+  reviewCount     Int     @default(0)
+  socialLinks     Json    @default("{}")
+  availability    Json    @default("[]")
+
+  spotifyConnected    Boolean @default(false)
+  spotifyAccessToken  String? @db.Text
+  spotifyRefreshToken String? @db.Text
+  appleMusicConnected Boolean @default(false)
+  appleMusicToken     String? @db.Text
+
+  primaryCategory String  @default("musician")
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  genres     MusicianGenre[]
+  categories TalentCategory[]
+  albums     Album[]
+  bookings   Booking[]
+  reviews    Review[]
+  jobApplications JobApplication[]
+  payouts    Payout[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stageName])
+  @@index([location])
+  @@index([rating])
+  @@index([primaryCategory])
+}
+
+model MusicianGenre {
+  id         String @id @default(cuid())
+  musicianId String
+  genreId    String
+
+  musician MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  genre    Genre           @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@unique([musicianId, genreId])
+  @@index([genreId])
+}
+
+model Album {
+  id          String      @id @default(cuid())
+  musicianId  String
+  title       String
+  coverArt    String?
+  releaseYear Int
+  source      MusicSource @default(manual)
+  externalId  String?
+  externalUrl String?
+
+  musician MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  tracks   Track[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([musicianId])
+  @@index([source, externalId])
+}
+
+model Track {
+  id          String  @id @default(cuid())
+  albumId     String
+  title       String
+  duration    Int     @default(0)
+  trackNumber Int     @default(1)
+  previewUrl  String?
+  genre       String?
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+
+  @@index([albumId])
+}
+
+model VenueProfile {
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  venueName    String
+  description  String  @default("") @db.Text
+  location     String  @default("")
+  capacity     Int     @default(0)
+  venueType    String  @default("Other")
+  profileImage String?
+  bannerImage  String?
+
+  clientType       String  @default("venue")
+  membershipTierId String?
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membershipTier MembershipTier? @relation(fields: [membershipTierId], references: [id])
+  bookings       Booking[]
+  jobListings    JobListing[]
+  promotionCampaigns PromotionCampaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueName])
+  @@index([location])
+  @@index([membershipTierId])
+  @@index([clientType])
+}
+
+model Booking {
+  id                 String        @id @default(cuid())
+  musicianId         String
+  venueId            String
+  jobApplicationId   String?       @unique
+  title              String        @default("Gig booking")
+  eventType          String        @default("Live performance")
+  eventDate          DateTime
+  startTime          String
+  endTime            String
+  venueAddress       String        @default("")
+  audienceSize       Int?
+  loadInTime         String?
+  soundcheckTime     String?
+  setupNotes         String?       @db.Text
+  requiredServices   Json          @default("[]")
+  equipmentProvided  Json          @default("[]")
+  hospitality        Json          @default("{}")
+  contactName        String?
+  contactEmail       String?
+  contactPhone       String?
+  status             BookingStatus @default(pending)
+  notes              String?       @db.Text
+  fee                Float         @default(0)
+  currency           String        @default("GBP")
+  depositAmount      Float         @default(0)
+  platformFeeRate    Float         @default(0.05)
+  platformFeeAmount  Float         @default(0)
+  processorFeeEstimate Float       @default(0)
+  totalChargeAmount  Float         @default(0)
+  netPayoutAmount    Float         @default(0)
+  paymentStatus      PaymentStatus @default(pending)
+  payoutStatus       PayoutStatus  @default(pending)
+  cancellationPolicy String?       @db.Text
+  source             BookingSource @default(direct_request)
+
+  musician       MusicianProfile          @relation(fields: [musicianId], references: [id])
+  venue          VenueProfile             @relation(fields: [venueId], references: [id])
+  jobApplication JobApplication?          @relation(fields: [jobApplicationId], references: [id], onDelete: SetNull)
+  transactions   MarketplaceTransaction[]
+  review         Review?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([musicianId])
+  @@index([venueId])
+  @@index([status])
+  @@index([eventDate])
+  @@index([source])
+  @@index([paymentStatus])
+  @@index([payoutStatus])
+}
+
+model Review {
+  id         String @id @default(cuid())
+  bookingId  String @unique
+  reviewerId String
+  musicianId String
+  rating     Int
+  comment    String @default("") @db.Text
+
+  booking  Booking         @relation(fields: [bookingId], references: [id])
+  reviewer User            @relation(fields: [reviewerId], references: [id])
+  musician MusicianProfile @relation(fields: [musicianId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([reviewerId])
+  @@index([musicianId])
+  @@index([rating])
+}
+
+model MembershipTier {
+  id       String @id @default(cuid())
+  name     String @unique
+  price    Float  @default(0)
+  features Json   @default("[]")
+
+  venues VenueProfile[]
+}
+model JobListing {
+  id                    String           @id @default(cuid())
+  venueId               String
+  title                 String
+  description           String           @default("") @db.Text
+  eventType             String           @default("Live performance")
+  eventDate             DateTime?
+  startTime             String?
+  endTime               String?
+  venueAddress          String           @default("")
+  location              String           @default("")
+  budgetMin             Float            @default(0)
+  budgetMax             Float            @default(0)
+  currency              String           @default("GBP")
+  categories            Json             @default("[]")
+  genres                Json             @default("[]")
+  requiredServices      Json             @default("[]")
+  equipmentProvided     Json             @default("[]")
+  applicationDeadline   DateTime?
+  status                JobListingStatus @default(draft)
+  isPromoted            Boolean          @default(false)
+  visibilityScore       Float            @default(0)
+
+  venue              VenueProfile        @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  applications       JobApplication[]
+  promotionCampaigns PromotionCampaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueId])
+  @@index([status])
+  @@index([eventDate])
+  @@index([applicationDeadline])
+  @@index([isPromoted, visibilityScore])
+}
+
+model JobApplication {
+  id                String               @id @default(cuid())
+  jobListingId      String
+  musicianId        String
+  coverMessage      String               @default("") @db.Text
+  proposedFee       Float?
+  availabilityNotes String?              @db.Text
+  status            JobApplicationStatus @default(submitted)
+
+  jobListing JobListing      @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  musician   MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  booking    Booking?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([jobListingId, musicianId])
+  @@index([musicianId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model MarketplaceTransaction {
+  id                   String        @id @default(cuid())
+  bookingId            String
+  provider             String?
+  providerPaymentId    String?
+  performanceFee       Float         @default(0)
+  platformFeeRate      Float         @default(0.05)
+  platformFeeAmount    Float         @default(0)
+  processorFeeEstimate Float         @default(0)
+  totalChargeAmount    Float         @default(0)
+  artistPayoutAmount   Float         @default(0)
+  currency             String        @default("GBP")
+  status               PaymentStatus @default(pending)
+  paidAt               DateTime?
+  refundedAt           DateTime?
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  payouts Payout[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([status])
+  @@index([providerPaymentId])
+  @@index([createdAt])
+}
+
+model Payout {
+  id                 String       @id @default(cuid())
+  transactionId      String
+  musicianId         String
+  providerPayoutId   String?
+  amount             Float        @default(0)
+  currency           String       @default("GBP")
+  status             PayoutStatus @default(pending)
+  scheduledFor       DateTime?
+  paidAt             DateTime?
+
+  transaction MarketplaceTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  musician    MusicianProfile        @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([transactionId])
+  @@index([musicianId])
+  @@index([status])
+}
+
+model PromotionPricingOption {
+  id             String                @id @default(cuid())
+  name           String
+  placement      PromotionPlacement
+  billingModel   PromotionBillingModel
+  price          Float                 @default(0)
+  currency       String                @default("GBP")
+  durationDays   Int?
+  includedViews  Int?
+  description    String                @default("") @db.Text
+  active         Boolean               @default(true)
+
+  campaigns PromotionCampaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([placement, billingModel])
+  @@index([active])
+}
+
+model PromotionCampaign {
+  id              String                @id @default(cuid())
+  venueId         String
+  jobListingId    String?
+  pricingOptionId String?
+  placement       PromotionPlacement
+  billingModel    PromotionBillingModel
+  status          PromotionStatus       @default(draft)
+  budgetAmount    Float                 @default(0)
+  spentAmount     Float                 @default(0)
+  currency        String                @default("GBP")
+  startsAt        DateTime
+  endsAt          DateTime?
+  viewLimit       Int?
+  views           Int                   @default(0)
+  clicks          Int                   @default(0)
+
+  venue         VenueProfile            @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  jobListing    JobListing?             @relation(fields: [jobListingId], references: [id], onDelete: SetNull)
+  pricingOption PromotionPricingOption? @relation(fields: [pricingOptionId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueId])
+  @@index([jobListingId])
+  @@index([placement, status])
+  @@index([startsAt, endsAt])
+}
+
+model AnalyticsEvent {
+  id                  String             @id @default(cuid())
+  eventType           AnalyticsEventType
+  actorUserId         String?
+  musicianId          String?
+  venueId             String?
+  bookingId           String?
+  jobListingId        String?
+  promotionCampaignId String?
+  metadata            Json?
+  occurredAt          DateTime           @default(now())
+
+  @@index([eventType])
+  @@index([actorUserId])
+  @@index([musicianId])
+  @@index([venueId])
+  @@index([bookingId])
+  @@index([jobListingId])
+  @@index([promotionCampaignId])
+  @@index([occurredAt])
+}
+
+model Genre {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  musicians MusicianGenre[]
+}
+
+model CreativeCategory {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+  icon String @default("")
+
+  talents TalentCategory[]
+
+  @@index([slug])
+}
+
+model TalentCategory {
+  id         String @id @default(cuid())
+  musicianId String
+  categoryId String
+
+  musician MusicianProfile  @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  category CreativeCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([musicianId, categoryId])
+  @@index([categoryId])
+}
+
+model AuditLog {
+  id             String             @id @default(cuid())
+  event          String
+  category       AuditEventCategory
+  level          AuditLogLevel      @default(info)
+  actorUserId    String?
+  actorEmailHash String?
+  ipAddressHash  String?
+  userAgent      String?            @db.Text
+  requestId      String?
+  targetType     String?
+  targetId       String?
+  metadata       Json?
+  occurredAt     DateTime           @default(now())
+  expiresAt      DateTime
+
+  actor User? @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([event])
+  @@index([category])
+  @@index([level])
+  @@index([actorUserId])
+  @@index([requestId])
+  @@index([occurredAt])
+  @@index([expiresAt])
+}

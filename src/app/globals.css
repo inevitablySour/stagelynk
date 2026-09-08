@@ -1,26 +1,94 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f3e4cb;
+  --foreground: #2f3526;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-inter);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Semantic app tokens: change these first when rebranding. */
+  --color-page: #f3e4cb;
+  --color-page-muted: #ecd9b8;
+  --color-surface: #fffaf0;
+  --color-surface-strong: #fff3d8;
+  --color-line: #dcc49a;
+  --color-line-strong: #c7a775;
+  --color-ink: #2f3526;
+  --color-muted: #756b5b;
+  --color-brand: #556b2f;
+  --color-brand-hover: #465826;
+  --color-brand-soft: #e4ead3;
+  --color-accent: #d67b28;
+  --color-accent-hover: #b9621f;
+
+  --color-sand-50: #fffaf0;
+  --color-sand-100: #f3e4cb;
+  --color-sand-200: #e6cfaa;
+  --color-sand-300: #d7b982;
+
+  --color-olive-50: #f3f5ec;
+  --color-olive-100: #e4ead3;
+  --color-olive-200: #ccd8ac;
+  --color-olive-300: #afc27d;
+  --color-olive-400: #8da653;
+  --color-olive-500: #6f873b;
+  --color-olive-600: #556b2f;
+  --color-olive-700: #465826;
+  --color-olive-800: #394720;
+  --color-olive-900: #2f3b1d;
+
+  --color-copper-100: #fde8cf;
+  --color-copper-200: #f8ca93;
+  --color-copper-400: #e99543;
+  --color-copper-500: #d67b28;
+  --color-copper-600: #b9621f;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .brand-gradient {
+    @apply bg-gradient-to-r from-brand to-accent;
+  }
+
+  .section-surface {
+    @apply bg-surface;
+  }
+
+  .section-brand {
+    @apply border-y border-accent/35 bg-gradient-to-b from-olive-900 via-olive-800 to-brand;
+  }
+
+  .section-muted {
+    @apply border-y border-line bg-page-muted/55;
+  }
+
+  .section-raised {
+    @apply border-y border-line bg-gradient-to-b from-surface to-page;
+  }
+
+  .panel-soft {
+    @apply rounded-2xl border border-line bg-surface shadow-[0_24px_70px_-45px_rgba(47,59,29,0.55)];
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
