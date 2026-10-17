@@ -72,11 +72,14 @@ export async function POST(request: Request) {
   }
 
   const musician = await prisma.musicianProfile.findUnique({
-    where: { id: parsed.data.musicianId },
+    where: { id: parsed.data.musicianId, user: { deletedAt: null } },
     include: { user: { select: { email: true } } },
   });
   if (!musician) {
     return NextResponse.json({ success: false, message: "Musician not found" }, { status: 404 });
+  }
+  if (musician.userId === session.user.id) {
+    return NextResponse.json({ success: false, message: "You cannot book your own profile." }, { status: 400 });
   }
 
   const paymentMethod = await stripe.paymentMethods.retrieve(parsed.data.paymentMethodId);

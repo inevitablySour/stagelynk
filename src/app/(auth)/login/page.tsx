@@ -139,7 +139,7 @@ export default function LoginPage() {
                 <input type="checkbox" className="rounded border-stone-300" />
                 Remember me
               </label>
-              <Link href="/contact" className="text-sm text-olive-600 hover:underline">
+              <Link href="/forgot-password" className="text-sm text-olive-600 hover:underline">
                 Forgot password?
               </Link>
             </div>

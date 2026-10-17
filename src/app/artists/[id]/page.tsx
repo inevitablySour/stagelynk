@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, MapPin, Clock, Calendar, ExternalLink, Music2, AudioLines, Award, SlidersHorizontal, Star } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, MapPin, Clock, Calendar, AudioLines, Award, SlidersHorizontal, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,14 +16,7 @@ import { ProfileArtwork } from "@/components/artists/profile-artwork";
 import { CREATIVE_CATEGORIES } from "@/config";
 import type { SocialLinks } from "@/types";
 import { formatMoney } from "@/lib/marketplace-fees";
-import { SpotifyPlayer } from "@/components/artists/spotify-player";
-import { spotifyEmbedUrl } from "@/lib/spotify-embed";
-
-function formatDuration(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { PortfolioRelease } from "@/components/artists/portfolio-release";
 
 export default async function ArtistProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -47,7 +40,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
 
   const artist = serializeMusicianProfile(profile);
   const session = await auth();
-  const isSignedInVenue = session?.user?.role === "venue";
+  const viewer = session?.user ? { role: session.user.role, isOwner: session.user.id === artist.userId } : null;
 
   const reviews = await prisma.review.findMany({
     where: { musicianId: id },
@@ -94,7 +87,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col gap-2 lg:pt-5">
-                  <Button size="lg" asChild><Link href="#book">Request a booking <ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button>
+                  <Button size="lg" asChild><Link href={viewer?.isOwner ? (viewer.role === "venue" ? "/venue/profile" : "/musician/profile") : "#book"}>{viewer?.isOwner ? "Manage your profile" : viewer && viewer.role !== "venue" ? "Booking information" : "Request a booking"}<ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button>
                   <p className="text-center text-xs text-muted">Share your idea. Find your creative fit.</p>
                 </div>
               </div>
@@ -135,34 +128,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                       <p className="mt-2 text-sm leading-6 text-muted">Work samples haven&apos;t been added yet. Explore their links for more of their creative world.</p>
                     </div>
                   )}
-                  {artist.discography.map((album) => (
-                    <article key={album.id} className="overflow-hidden rounded-2xl border border-line">
-                      <div className="flex items-center gap-4 bg-page/40 p-4 sm:p-5">
-                        <ProfileArtwork src={album.coverArt} alt={`${album.title} artwork`} sizes="80px" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand sm:h-20 sm:w-20"><Music2 className="h-7 w-7" /></ProfileArtwork>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="break-words text-base font-semibold text-ink sm:text-lg">{album.title}</h3>
-                          <p className="mt-1 text-xs text-muted">{album.releaseYear} · {album.tracks.length} {album.tracks.length === 1 ? "track" : "tracks"}</p>
-                          {album.externalUrl && <a href={album.externalUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">Listen on {album.source === "spotify" ? "Spotify" : album.source === "apple_music" ? "Apple Music" : "release page"} <ExternalLink className="h-3 w-3" /></a>}
-                        </div>
-                      </div>
-                      {spotifyEmbedUrl(album.externalUrl) ? (
-                        <div className="border-t border-line bg-page/20 p-3 sm:p-4">
-                          <SpotifyPlayer url={album.externalUrl} title={album.title} />
-                        </div>
-                      ) : <ol className="divide-y divide-line/60">
-                        {[...album.tracks].sort((a, b) => a.trackNumber - b.trackNumber).map((track) => (
-                          <li key={track.id} className="px-4 py-3 sm:px-5">
-                            <div className="flex items-center gap-3 text-sm">
-                              <span className="w-5 shrink-0 text-xs tabular-nums text-muted">{String(track.trackNumber).padStart(2, "0")}</span>
-                              <span className="min-w-0 flex-1 break-words font-medium text-ink">{track.title}</span>
-                              {track.genre && <span className="hidden text-xs text-muted sm:block">{track.genre}</span>}
-                              <span className="shrink-0 text-xs tabular-nums text-muted">{track.duration > 0 ? formatDuration(track.duration) : "—"}</span>
-                            </div>
-                          </li>
-                        ))}
-                      </ol>}
-                    </article>
-                  ))}
+                  {artist.discography.map((album) => <PortfolioRelease key={album.id} album={album} />)}
                 </CardContent>
               </Card>
 
@@ -207,7 +173,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
 
             <aside className="min-w-0 space-y-5 lg:sticky lg:top-24" aria-label="Booking and artist details">
               {[artist.performanceFee, artist.hourlyFee, artist.dayFee].some((rate) => rate != null) && <Card><CardHeader><CardTitle className="text-base">Quoted fees</CardTitle></CardHeader><CardContent><dl className="space-y-3 text-sm">{[["Performance", artist.performanceFee], ["Per hour", artist.hourlyFee], ["Per day", artist.dayFee]].map(([label, fee]) => typeof fee === "number" ? <div key={String(label)} className="flex justify-between gap-3"><dt className="text-muted">{label}</dt><dd className="font-semibold text-brand">{formatMoney(fee)}</dd></div> : null)}</dl><p className="mt-4 text-xs leading-5 text-muted">Starting rates; confirm the project scope and agreed fee before booking.</p></CardContent></Card>}
-              <BookingRequestCard musicianId={artist.id} stageName={artist.stageName} isSignedInVenue={isSignedInVenue} />
+              <BookingRequestCard musicianId={artist.id} stageName={artist.stageName} viewer={viewer} />
               <Card>
                 <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calendar className="h-4 w-4 text-brand" />Availability</CardTitle></CardHeader>
                 <CardContent>

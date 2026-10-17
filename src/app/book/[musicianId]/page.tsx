@@ -15,10 +15,11 @@ export default async function BookArtistPage({ params }: { params: Promise<{ mus
   if (session.user.role !== "venue") redirect("/musician");
 
   const musician = await prisma.musicianProfile.findUnique({
-    where: { id: musicianId },
-    select: { id: true, stageName: true, location: true, profileImage: true, primaryCategory: true },
+    where: { id: musicianId, user: { deletedAt: null } },
+    select: { id: true, userId: true, stageName: true, location: true, profileImage: true, primaryCategory: true },
   });
   if (!musician) notFound();
+  if (musician.userId === session.user.id) redirect(`/artists/${musician.id}`);
 
   const venue = await prisma.venueProfile.findUnique({ where: { userId: session.user.id }, select: { id: true } });
   const gaps = venue ? await getTechnicalGaps(musician.id, venue.id) : [];

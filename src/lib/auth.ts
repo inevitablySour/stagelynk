@@ -10,6 +10,7 @@ import { getLogger } from "@/lib/logger";
 import { verifyPassword } from "@/lib/password";
 import { getRequestMetadataFromHeaders } from "@/lib/request-context";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sendWelcomeEmail } from "@/lib/email-templates";
 
 const authLogger = getLogger("auth");
 const MAX_FAILED_LOGIN_ATTEMPTS = Number(process.env.AUTH_MAX_FAILED_LOGIN_ATTEMPTS ?? 5);
@@ -157,6 +158,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: user.name,
             image: user.image,
             role: user.role,
+            sessionVersion: user.sessionVersion,
           };
         } catch (error) {
           authLogger.error({ err: error, email }, "Credentials authorize failed");
@@ -210,18 +212,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       return "/login?error=OAuthAccountNotLinked";
     },
-    async jwt({ token, user, trigger }) {
-      if (user) {
-        token.role = user.role ?? "musician";
-      }
-
-      if (trigger === "update" && token.sub) {
-        const freshUser = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: { role: true },
-        });
-        if (freshUser) token.role = freshUser.role;
-      }
+    async jwt({ token, user }) {
+      const userId = user?.id ?? token.sub;
+      if (!userId) return null;
+      const freshUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true, deletedAt: true, sessionVersion: true },
+      });
+      if (!freshUser || freshUser.deletedAt) return null;
+      if (user?.sessionVersion !== undefined && user.sessionVersion !== freshUser.sessionVersion) return null;
+      if (!user && (token.sessionVersion ?? 0) !== freshUser.sessionVersion) return null;
+      token.sessionVersion = freshUser.sessionVersion;
+      token.role = freshUser.role;
 
       return token;
     },
@@ -234,6 +236,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
   events: {
+    async createUser({ user }) {
+      if (user.email) {
+        await sendWelcomeEmail(
+          { email: user.email, name: user.name ?? undefined }
+        ).catch((error) => authLogger.error({ err: error }, "OAuth welcome email failed"));
+      }
+    },
     async signIn({ user, account, isNewUser }) {
       if (account?.provider === "credentials") return;
 

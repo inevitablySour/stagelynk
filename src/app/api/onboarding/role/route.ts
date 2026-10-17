@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { getLogger } from "@/lib/logger";
 import { getRequestMetadataFromHeaders } from "@/lib/request-context";
 import { writeAuditLog } from "@/lib/audit-log";
-import { sendWelcomeEmail } from "@/lib/email-templates";
+import { sendProfileReadyEmail } from "@/lib/email-templates";
 import { CURRENT_TERMS_VERSION } from "@/config";
 
 const log = getLogger("api-onboarding-role");
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (session.user.email) {
-      sendWelcomeEmail({ email: session.user.email, name: user?.name ?? undefined }, parsed.data.role).catch(
+      await sendProfileReadyEmail({ email: session.user.email, name: user?.name ?? undefined }, parsed.data.role).catch(
         (err) => log.error({ err }, "Failed to send welcome email")
       );
     }

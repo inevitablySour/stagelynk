@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       metadata: { provider: "credentials", role: user.role, termsVersion: CURRENT_TERMS_VERSION },
     });
 
-    sendWelcomeEmail({ email: user.email, name }, user.role === "venue" ? "venue" : "musician").catch((err) =>
+    await sendWelcomeEmail({ email: user.email, name }, user.role === "venue" ? "venue" : "musician").catch((err) =>
       log.error({ err }, "Failed to send welcome email")
     );
 

@@ -185,6 +185,7 @@ model User {
   email            String    @unique
   emailVerified    DateTime?
   passwordHash     String?
+  sessionVersion   Int       @default(0)
   image            String?
   role             UserRole  @default(musician)
   failedLoginCount Int       @default(0)

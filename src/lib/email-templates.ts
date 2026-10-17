@@ -4,8 +4,51 @@ import { formatMoney } from "@/lib/marketplace-fees";
 import { APP_NAME } from "@/config";
 
 function appUrl(path: string) {
-  const origin = process.env.AUTH_URL ?? "http://localhost:3000";
-  return `${origin}${path}`;
+  const origin = new URL(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "https://stagelynk.co").origin;
+  return new URL(path, origin).toString();
+}
+
+export async function sendProfileReadyEmail(to: Recipient, role: "musician" | "venue") {
+  await sendEmail({
+    from: { email: MAIL_FROM.accounts, name: `${APP_NAME} Accounts` },
+    to: [to],
+    subject: `Your ${APP_NAME} ${role === "venue" ? "client" : "creative"} profile is ready`,
+    text: `Your profile is ready. Open your dashboard at ${appUrl(role === "venue" ? "/venue" : "/musician")}.`,
+    html: renderEmailHtml({
+      heading: "Your profile is ready",
+      bodyHtml: "<p>Your account setup is complete. You can now use your dashboard and keep your public profile up to date.</p>",
+      button: { label: "Open your dashboard", url: appUrl(role === "venue" ? "/venue" : "/musician") },
+    }),
+  });
+}
+
+export async function sendPasswordResetEmail(to: Recipient, token: string) {
+  const url = appUrl(`/reset-password?token=${encodeURIComponent(token)}`);
+  await sendEmail({
+    from: { email: MAIL_FROM.accounts, name: `${APP_NAME} Accounts` },
+    to: [to],
+    subject: `Reset your ${APP_NAME} password`,
+    text: `Reset your password using this single-use link, valid for 30 minutes: ${url}\n\nIf you did not request this, ignore this email. Your password has not changed.`,
+    html: renderEmailHtml({
+      heading: "Reset your password",
+      bodyHtml: "<p>We received a request to reset your StageLynk password.</p><p>This link can be used once and expires in 30 minutes. If you did not request a reset, you can safely ignore this email.</p>",
+      button: { label: "Choose a new password", url },
+    }),
+  });
+}
+
+export async function sendPasswordChangedEmail(to: Recipient) {
+  await sendEmail({
+    from: { email: MAIL_FROM.accounts, name: `${APP_NAME} Accounts` },
+    to: [to],
+    subject: `Your ${APP_NAME} password was changed`,
+    text: `Your password was changed and existing sessions were signed out. If this was not you, contact support@stagelynk.co immediately.`,
+    html: renderEmailHtml({
+      heading: "Your password was changed",
+      bodyHtml: "<p>Your password has been changed. Existing sessions have been invalidated.</p><p>If this wasn't you, contact support@stagelynk.co immediately.</p>",
+      button: { label: "Contact support", url: appUrl("/contact") },
+    }),
+  });
 }
 
 interface Recipient {
@@ -13,9 +56,9 @@ interface Recipient {
   name?: string;
 }
 
-export async function sendWelcomeEmail(to: Recipient, role: "musician" | "venue") {
-  const dashboardPath = role === "venue" ? "/venue" : "/musician";
-  await sendEmail({
+export async function sendWelcomeEmail(to: Recipient, role?: "musician" | "venue") {
+  const dashboardPath = role === "venue" ? "/venue" : role === "musician" ? "/musician" : "/onboarding/role";
+  return sendEmail({
     from: { email: MAIL_FROM.accounts, name: APP_NAME },
     to: [to],
     subject: `Welcome to ${APP_NAME}`,
@@ -23,10 +66,12 @@ export async function sendWelcomeEmail(to: Recipient, role: "musician" | "venue"
     html: renderEmailHtml({
       heading: `Welcome to ${APP_NAME}${to.name ? `, ${to.name}` : ""}!`,
       bodyHtml:
-        role === "venue"
+        role === undefined
+          ? "<p>Your account has been created. Choose your profile type and complete your profile to get started.</p>"
+          : role === "venue"
           ? "<p>Your account is ready. You can now search for creative talent and start sending booking requests.</p>"
           : "<p>Your account is ready. Build out your profile and portfolio so clients can find and book you.</p>",
-      button: { label: "Go to your dashboard", url: appUrl(dashboardPath) },
+      button: { label: role ? "Go to your dashboard" : "Complete your profile", url: appUrl(dashboardPath) },
     }),
   });
 }

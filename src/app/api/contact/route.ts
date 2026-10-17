@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
   try {
     await sendEmail({
-      from: { email: MAIL_FROM.noreply, name: APP_NAME },
+      from: { email: MAIL_FROM.support, name: APP_NAME },
       to: [{ email: destination }],
       replyTo: { email, name },
       subject: `[Contact form] ${subject}`,

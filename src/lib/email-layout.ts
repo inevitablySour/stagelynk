@@ -5,6 +5,10 @@ const BRAND_SOFT = "#e4ead3";
 const INK = "#2f3526";
 const MUTED = "#756b5b";
 
+export function escapeEmailHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 export interface EmailButton {
   label: string;
   url: string;
@@ -33,12 +37,12 @@ export function renderEmailHtml(options: {
             </tr>
             <tr>
               <td style="padding:32px;">
-                <h1 style="margin:0 0 16px;color:${INK};font-size:20px;">${heading}</h1>
+                <h1 style="margin:0 0 16px;color:${INK};font-size:20px;">${escapeEmailHtml(heading)}</h1>
                 <div style="color:${INK};font-size:14px;line-height:1.6;">${bodyHtml}</div>
                 ${
                   button
                     ? `<table role="presentation" style="margin-top:24px;"><tr><td style="background-color:${BRAND};border-radius:8px;">
-                        <a href="${button.url}" style="display:inline-block;padding:12px 24px;color:#fffaf0;font-size:14px;font-weight:bold;text-decoration:none;">${button.label}</a>
+                        <a href="${escapeEmailHtml(button.url)}" style="display:inline-block;padding:12px 24px;color:#fffaf0;font-size:14px;font-weight:bold;text-decoration:none;">${escapeEmailHtml(button.label)}</a>
                       </td></tr></table>`
                     : ""
                 }
