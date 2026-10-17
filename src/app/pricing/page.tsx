@@ -105,7 +105,7 @@ export default function PricingPage() {
               <div className="space-y-6">
                 {[
                   { q: "Do creatives pay anything to join?", a: `No. ${APP_NAME} is completely free for creatives. You create your profile, apply to projects, and get booked at no cost.` },
-                  { q: "How does the 5% fee work?", a: "The 5% platform fee is added on top of the creative's quoted rate and paid by the client. For example, if a creative quotes £500, the client pays £525 (plus processing). The creative receives their full £500." },
+                  { q: "How does the 5% fee work?", a: "The 5% platform fee is added on top of the creative's quoted rate and paid by the client. For example, if a creative quotes €500, the client pays €525 (plus processing). The creative receives their full €500." },
                   { q: "Are there any subscriptions?", a: "No mandatory subscriptions. The platform earns through the 5% transaction fee on completed bookings. Optional paid boosts are available for clients who want extra visibility." },
                   { q: "What payment methods do you accept?", a: "We accept all major credit and debit cards. Enterprise clients can pay by invoice." },
                   { q: "What are paid boosts?", a: "Clients can optionally pay to promote their job listings or profile in search results. Boosts are priced either by time (e.g. 7-day or 30-day) or by impressions (e.g. 500 or 2,000 views)." },

@@ -23,9 +23,19 @@ export interface MusicianProfile {
   bannerImage?: string;
   socialLinks: SocialLinks;
   availability: AvailabilitySlot[];
+  instruments: string[];
+  subgenres?: string[];
+  influences?: string[];
+  favorites?: string[];
+  performanceFee?: number | null;
+  hourlyFee?: number | null;
+  dayFee?: number | null;
+  credentials: Credential[];
   rating: number;
+  weightedRating: number;
   reviewCount: number;
   discography: Album[];
+  primaryCategory: string;
   createdAt: string;
 }
 
@@ -42,9 +52,19 @@ export interface SocialLinks {
 }
 
 export interface AvailabilitySlot {
-  dayOfWeek: number; // 0-6
-  startTime: string; // HH:mm
-  endTime: string;
+  id: string;
+  startDate: string;
+  endDate: string;
+}
+
+export type CredentialType = "degree" | "certificate" | "license" | "award";
+
+export interface Credential {
+  id: string;
+  type: CredentialType;
+  title: string;
+  issuer: string;
+  year?: number;
 }
 
 // ── Discography / Music ──────────────────────────────────────
@@ -240,15 +260,43 @@ export interface Genre {
   slug: string;
 }
 
+export interface EquipmentItem {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+}
+
+export interface EquipmentRequirement {
+  equipmentId: string;
+  name: string;
+  category: string;
+  quantity: number;
+  notes: string;
+}
+
+export interface TechnicalGap {
+  equipmentId: string;
+  name: string;
+  category: string;
+  quantityNeeded: number;
+  quantityAvailable: number;
+  shortfall: number;
+}
+
 // ── Search & Filters ─────────────────────────────────────────
 export interface ArtistSearchFilters {
   query?: string;
   genres?: string[];
+  categories?: string[];
+  instruments?: string[];
+  hasCredentials?: boolean;
   minRating?: number;
   location?: string;
   experienceMin?: number;
   experienceMax?: number;
-  availability?: string; // day of week
+  /** ISO date — only artists with an open availability window covering this date. */
+  availableOn?: string;
   sortBy?: "rating" | "experience" | "name" | "newest";
 }
 

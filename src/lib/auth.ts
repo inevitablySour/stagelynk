@@ -47,7 +47,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             where: { email },
           });
 
-          if (!user?.passwordHash) {
+          if (!user || user.deletedAt) {
+            await writeAuditLog({
+              event: "authn_login_fail",
+              category: "auth",
+              level: "warn",
+              actorEmail: email,
+              ipAddress: requestMetadata?.ipAddress,
+              userAgent: requestMetadata?.userAgent,
+              requestId: requestMetadata?.requestId,
+              metadata: { provider: "credentials", reason: "invalid_credentials" },
+            });
+            return null;
+          }
+
+          if (!user.passwordHash) {
             await writeAuditLog({
               event: "authn_login_fail",
               category: "auth",
@@ -165,10 +179,50 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account }) {
+      if (!account || account.provider === "credentials") return true;
+
+      const email = user.email?.toLowerCase().trim();
+      if (!email) return true;
+
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+        include: { accounts: { select: { provider: true, providerAccountId: true } } },
+      });
+
+      if (!existingUser) return true;
+
+      if (existingUser.deletedAt) {
+        authLogger.warn({ email }, "Blocked OAuth sign-in for deleted account");
+        return "/login?error=AccountDeleted";
+      }
+
+      const alreadyLinked = existingUser.accounts.some(
+        (a) => a.provider === account.provider && a.providerAccountId === account.providerAccountId
+      );
+
+      if (alreadyLinked) return true;
+
+      authLogger.warn(
+        { email, provider: account.provider, existingUserId: existingUser.id },
+        "Blocked OAuth sign-in for email with an existing unlinked account"
+      );
+
+      return "/login?error=OAuthAccountNotLinked";
+    },
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.role = user.role ?? "musician";
       }
+
+      if (trigger === "update" && token.sub) {
+        const freshUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { role: true },
+        });
+        if (freshUser) token.role = freshUser.role;
+      }
+
       return token;
     },
     async session({ session, token }) {

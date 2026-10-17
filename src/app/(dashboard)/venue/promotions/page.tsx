@@ -8,17 +8,17 @@ import { formatMoney } from "@/lib/marketplace-fees";
 import type { PromotionStatus } from "@/types";
 
 const PRICING_OPTIONS = [
-  { id: "p1", name: "7-Day Job Boost", placement: "Job listing", billingModel: "Time-based", price: 15, currency: "GBP", description: "Your job listing appears at the top of search results for 7 days." },
-  { id: "p2", name: "30-Day Job Boost", placement: "Job listing", billingModel: "Time-based", price: 45, currency: "GBP", description: "Featured placement in job search results for a full month." },
-  { id: "p3", name: "500 Impressions Pack", placement: "Artist search", billingModel: "View-based", price: 20, currency: "GBP", description: "Your venue appears in artist search results until 500 impressions are reached." },
-  { id: "p4", name: "2,000 Impressions Pack", placement: "Artist search", billingModel: "View-based", price: 60, currency: "GBP", description: "High-visibility placement with up to 2,000 impressions across search and genre pages." },
-  { id: "p5", name: "Homepage Featured Spot", placement: "Homepage", billingModel: "Time-based", price: 75, currency: "GBP", description: "Featured on the StageLynk homepage for 7 days. Maximum exposure." },
+  { id: "p1", name: "7-Day Job Boost", placement: "Job listing", billingModel: "Time-based", price: 15, currency: "EUR", description: "Your job listing appears at the top of search results for 7 days." },
+  { id: "p2", name: "30-Day Job Boost", placement: "Job listing", billingModel: "Time-based", price: 45, currency: "EUR", description: "Featured placement in job search results for a full month." },
+  { id: "p3", name: "500 Impressions Pack", placement: "Artist search", billingModel: "View-based", price: 20, currency: "EUR", description: "Your venue appears in artist search results until 500 impressions are reached." },
+  { id: "p4", name: "2,000 Impressions Pack", placement: "Artist search", billingModel: "View-based", price: 60, currency: "EUR", description: "High-visibility placement with up to 2,000 impressions across search and genre pages." },
+  { id: "p5", name: "Homepage Featured Spot", placement: "Homepage", billingModel: "Time-based", price: 75, currency: "EUR", description: "Featured on the StageLynk homepage for 7 days. Maximum exposure." },
 ];
 
 const MOCK_CAMPAIGNS = [
-  { id: "c1", name: "DJ Residency – Job Boost", placement: "Job listing", billingModel: "Time-based", status: "active" as PromotionStatus, budgetAmount: 15, spentAmount: 15, currency: "GBP", startsAt: "Apr 28, 2026", endsAt: "May 5, 2026", views: 342, clicks: 28 },
-  { id: "c2", name: "Venue Search Visibility", placement: "Artist search", billingModel: "View-based", status: "active" as PromotionStatus, budgetAmount: 20, spentAmount: 14, currency: "GBP", startsAt: "Apr 25, 2026", endsAt: undefined, views: 350, clicks: 18, viewLimit: 500 },
-  { id: "c3", name: "NYE Gala – Homepage Feature", placement: "Homepage", billingModel: "Time-based", status: "completed" as PromotionStatus, budgetAmount: 75, spentAmount: 75, currency: "GBP", startsAt: "Dec 20, 2025", endsAt: "Dec 27, 2025", views: 1820, clicks: 145 },
+  { id: "c1", name: "DJ Residency – Job Boost", placement: "Job listing", billingModel: "Time-based", status: "active" as PromotionStatus, budgetAmount: 15, spentAmount: 15, currency: "EUR", startsAt: "Apr 28, 2026", endsAt: "May 5, 2026", views: 342, clicks: 28 },
+  { id: "c2", name: "Venue Search Visibility", placement: "Artist search", billingModel: "View-based", status: "active" as PromotionStatus, budgetAmount: 20, spentAmount: 14, currency: "EUR", startsAt: "Apr 25, 2026", endsAt: undefined, views: 350, clicks: 18, viewLimit: 500 },
+  { id: "c3", name: "NYE Gala – Homepage Feature", placement: "Homepage", billingModel: "Time-based", status: "completed" as PromotionStatus, budgetAmount: 75, spentAmount: 75, currency: "EUR", startsAt: "Dec 20, 2025", endsAt: "Dec 27, 2025", views: 1820, clicks: 145 },
 ];
 
 function statusVariant(s: PromotionStatus) {

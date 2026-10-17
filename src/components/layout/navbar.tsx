@@ -94,6 +94,8 @@ export function Navbar() {
           className="md:hidden p-2 text-stone-600"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
+          aria-controls="public-mobile-navigation"
         >
           {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
@@ -101,7 +103,7 @@ export function Navbar() {
 
       {/* Mobile dropdown */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-stone-200 bg-sand-50 px-4 pb-4">
+        <div id="public-mobile-navigation" className="md:hidden border-t border-stone-200 bg-sand-50 px-4 pb-4">
           <nav className="flex flex-col gap-3 pt-4">
             {NAV_LINKS.map((link) => (
               <Link

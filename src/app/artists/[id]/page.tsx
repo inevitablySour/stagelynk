@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { MapPin, Clock, Calendar, ExternalLink, Play, Music2 } from "lucide-react";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ArrowUpRight, MapPin, Clock, Calendar, ExternalLink, Music2, AudioLines, Award, SlidersHorizontal, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,36 +8,14 @@ import { StarRating } from "@/components/common/star-rating";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { getInitials } from "@/lib/utils";
-import type { Album, Review } from "@/types";
-
-// Mock data for this profile
-const artist = {
-  id: "1", stageName: "Nova Eclipse", bio: "Electronic music producer blending ambient textures with driving beats. With 8 years of experience performing at festivals, clubs, and private events across Europe, Nova Eclipse delivers immersive audio-visual experiences that captivate audiences.\n\nSpecializing in live electronic sets with hardware synthesizers and custom visuals, every performance is unique.", genres: [{ id: "7", name: "Electronic", slug: "electronic" }, { id: "14", name: "Indie", slug: "indie" }, { id: "2", name: "Pop", slug: "pop" }], experienceYears: 8, location: "London, UK", rating: 4.8, reviewCount: 42,
-  socialLinks: { spotify: "https://spotify.com", instagram: "https://instagram.com", website: "https://example.com" },
-};
-
-const mockAlbums: Album[] = [
-  {
-    id: "a1", title: "Midnight Frequencies", coverArt: undefined, releaseYear: 2024, source: "spotify", externalUrl: "https://open.spotify.com",
-    tracks: [
-      { id: "t1", title: "Neon Drift", duration: 245, trackNumber: 1, previewUrl: "#", genre: "Electronic" },
-      { id: "t2", title: "Lost Signal", duration: 312, trackNumber: 2, previewUrl: "#", genre: "Electronic" },
-      { id: "t3", title: "Binary Sunset", duration: 198, trackNumber: 3, previewUrl: "#", genre: "Ambient" },
-    ],
-  },
-  {
-    id: "a2", title: "Dawn Patterns", coverArt: undefined, releaseYear: 2023, source: "manual",
-    tracks: [
-      { id: "t4", title: "First Light", duration: 267, trackNumber: 1, genre: "Indie Electronic" },
-      { id: "t5", title: "Paper Waves", duration: 224, trackNumber: 2, genre: "Indie Electronic" },
-    ],
-  },
-];
-
-const mockReviews: Review[] = [
-  { id: "r1", bookingId: "b1", reviewerId: "v1", musicianId: "1", rating: 5, comment: "Incredible set — the crowd was electric from start to finish. Nova read the room perfectly and kept the energy building all night. Will definitely book again!", createdAt: "2024-11-15", reviewer: { name: "Sarah Mitchell", venueName: "The Warehouse Club" } },
-  { id: "r2", bookingId: "b2", reviewerId: "v2", musicianId: "1", rating: 4, comment: "Great performance with professional setup. Sound quality was excellent. Slight delay on arrival but made up for it with an extended set.", createdAt: "2024-10-02", reviewer: { name: "James Cooper", venueName: "Rooftop Bar London" } },
-];
+import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
+import { serializeMusicianProfile } from "@/lib/serializers";
+import { BookingRequestCard } from "@/components/artists/booking-request-card";
+import { ProfileArtwork } from "@/components/artists/profile-artwork";
+import { CREATIVE_CATEGORIES } from "@/config";
+import type { SocialLinks } from "@/types";
+import { formatMoney } from "@/lib/marketplace-fees";
 
 function formatDuration(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -44,183 +23,196 @@ function formatDuration(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function ArtistProfilePage() {
+export default async function ArtistProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
+  const profile = await prisma.musicianProfile.findUnique({
+    where: { id, user: { deletedAt: null } },
+    include: {
+      genres: { include: { genre: true } },
+      albums: { include: { tracks: true } },
+      credentials: true,
+      availabilitySlots: {
+        where: { endDate: { gte: new Date() } },
+        orderBy: { startDate: "asc" },
+      },
+      equipmentNeeds: { include: { equipment: true } },
+      equipmentOwned: { include: { equipment: true } },
+    },
+  });
+
+  if (!profile) notFound();
+
+  const artist = serializeMusicianProfile(profile);
+  const session = await auth();
+  const isSignedInVenue = session?.user?.role === "venue";
+
+  const reviews = await prisma.review.findMany({
+    where: { musicianId: id },
+    include: { reviewer: { include: { venueProfile: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const socialLinks = (artist.socialLinks ?? {}) as SocialLinks;
+  const category = CREATIVE_CATEGORIES.find((item) => item.slug === artist.primaryCategory)?.name ?? "Creative";
+  const upcomingAvailability = artist.availability;
+  const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const links = Object.entries(socialLinks).filter((entry): entry is [string, string] => Boolean(entry[1]));
+
   return (
     <>
       <Navbar />
-      <main className="flex-1">
-        {/* Banner */}
-        <div className="h-48 sm:h-64 bg-gradient-to-br from-olive-600 via-copper-600 to-copper-500" />
+      <main className="min-w-0 flex-1 pb-16 sm:pb-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Link href="/artists" className="my-6 inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-brand">
+            <ArrowLeft className="h-4 w-4" /> Back to discovery
+          </Link>
 
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-          {/* Profile header */}
-          <div className="relative -mt-16 mb-8 flex flex-col sm:flex-row sm:items-end gap-4">
-            <div className="h-28 w-28 rounded-full border-4 border-sand-50 bg-olive-100 flex items-center justify-center text-olive-700 font-bold text-3xl shadow-lg">
-              {getInitials(artist.stageName)}
+          <section className="overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_20px_70px_-45px_rgba(47,59,29,0.4)]" aria-label="Artist introduction">
+            <ProfileArtwork src={artist.bannerImage} alt={`${artist.stageName}'s cover`} sizes="(max-width: 1280px) 100vw, 1280px" className="h-44 bg-olive-900 sm:h-64">
+              <div className="absolute -right-10 -top-36 h-96 w-96 rounded-full border-[60px] border-olive-700/60" />
+              <div className="absolute -bottom-40 left-1/4 h-96 w-96 rounded-full border-[50px] border-copper-500/30" />
+              <div className="absolute inset-0 bg-gradient-to-r from-olive-900/20 to-copper-500/20" />
+            </ProfileArtwork>
+            <div className="relative px-5 pb-7 sm:px-8 sm:pb-8">
+              <ProfileArtwork src={artist.profileImage} alt={artist.stageName} sizes="144px" className="-mt-14 flex h-28 w-28 items-center justify-center rounded-3xl border-[5px] border-surface bg-brand-soft text-3xl font-bold text-brand shadow-lg sm:-mt-16 sm:h-36 sm:w-36 sm:text-4xl">
+                {getInitials(artist.stageName)}
+              </ProfileArtwork>
+              <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 max-w-3xl">
+                  <p className="eyebrow mb-2">{category}</p>
+                  <h1 className="break-words text-3xl font-bold tracking-tight text-ink sm:text-5xl">{artist.stageName}</h1>
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
+                    {artist.location && <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" />{artist.location}</span>}
+                    <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" />{artist.experienceYears > 0 ? `${artist.experienceYears} years of experience` : "Building their creative journey"}</span>
+                    <span className="inline-flex items-center gap-1.5"><Star className="h-4 w-4" />{artist.reviewCount > 0 ? `${artist.weightedRating}/10 weighted · ${artist.reviewCount} reviews` : "New here · discover their work"}</span>
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {artist.genres.map((genre) => <Badge key={genre.id} variant="secondary" className="px-3 py-1">{genre.name}</Badge>)}
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col gap-2 lg:pt-5">
+                  <Button size="lg" asChild><Link href="#book">Request a booking <ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button>
+                  <p className="text-center text-xs text-muted">Share your idea. Find your creative fit.</p>
+                </div>
+              </div>
             </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-stone-900">{artist.stageName}</h1>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-stone-500">
-                <span className="flex items-center gap-1"><MapPin className="h-4 w-4" />{artist.location}</span>
-                <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{artist.experienceYears} years experience</span>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {artist.genres.map((g) => (
-                  <Badge key={g.id} variant="secondary">{g.name}</Badge>
-                ))}
-              </div>
-              <div className="mt-2">
-                <StarRating rating={artist.rating} showValue reviewCount={artist.reviewCount} />
-              </div>
-            </div>
-            <Button size="lg" asChild>
-              <Link href="#book">
-                <Calendar className="mr-2 h-4 w-4" />
-                Book this creative
-              </Link>
-            </Button>
-          </div>
+            <nav aria-label="Profile sections" className="flex gap-6 overflow-x-auto border-t border-line px-5 sm:px-8">
+              {[["about", "About"], ["work", "Selected work"], ["rider", "Technical rider"], ["reviews", "Reviews"]].map(([anchor, label]) => (
+                <a key={anchor} href={`#${anchor}`} className="shrink-0 border-b-2 border-transparent py-4 text-sm font-medium text-muted transition-colors hover:border-brand hover:text-brand">{label}</a>
+              ))}
+            </nav>
+          </section>
 
-          <div className="grid gap-8 lg:grid-cols-3 pb-16">
-            {/* Left column (2/3) */}
-            <div className="lg:col-span-2 space-y-8">
-              {/* Bio */}
-              <Card>
-                <CardHeader><CardTitle>About</CardTitle></CardHeader>
+          <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
+            <div className="min-w-0 space-y-6">
+              <Card id="about" className="profile-section">
+                <CardHeader><p className="eyebrow">The creative behind the work</p><CardTitle className="text-xl leading-tight sm:text-2xl">Meet {artist.stageName}</CardTitle></CardHeader>
                 <CardContent>
-                  <p className="text-sm text-stone-600 whitespace-pre-line">{artist.bio}</p>
+                  <p className="whitespace-pre-line break-words text-sm leading-7 text-muted sm:text-base">{artist.bio || "Every creative story starts somewhere. This artist hasn't added their introduction yet — explore their work below."}</p>
+                  {artist.instruments.length > 0 && (
+                    <div className="mt-6 border-t border-line pt-5">
+                      <h3 className="mb-3 text-sm font-semibold text-ink">Instruments & tools</h3>
+                      <div className="flex flex-wrap gap-2">{artist.instruments.map((instrument) => <Badge key={instrument} variant="outline" className="px-3 py-1">{instrument}</Badge>)}</div>
+                    </div>
+                  )}
+                  {(artist.subgenres?.length || artist.influences?.length || artist.favorites?.length) ? <div className="mt-6 grid gap-5 border-t border-line pt-5 sm:grid-cols-2">{[["Subgenres", artist.subgenres], ["Influences", artist.influences], ["Four favorites", artist.favorites]].map(([title, values]) => Array.isArray(values) && values.length > 0 ? <div key={String(title)}><h3 className="mb-2 text-sm font-semibold text-ink">{String(title)}</h3><p className="text-sm leading-6 text-muted">{values.join(" · ")}</p></div> : null)}</div> : null}
                 </CardContent>
               </Card>
 
-              {/* Discography */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Music2 className="h-5 w-5" />
-                    Discography
-                  </CardTitle>
+              <Card id="work" className="profile-section overflow-hidden">
+                <CardHeader className="gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div><p className="eyebrow mb-2">Let the work speak</p><CardTitle className="text-xl leading-tight sm:text-2xl">Selected work</CardTitle></div>
+                  <Badge variant="outline">{artist.discography.length} {artist.discography.length === 1 ? "release" : "releases"}</Badge>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {mockAlbums.map((album) => (
-                    <div key={album.id}>
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="h-14 w-14 rounded-lg bg-gradient-to-br from-olive-400 to-copper-400 flex items-center justify-center text-white shrink-0">
-                          <Music2 className="h-6 w-6" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-stone-900">{album.title}</h4>
-                          <div className="flex items-center gap-2 text-xs text-stone-500">
-                            <span>{album.releaseYear}</span>
-                            <span>·</span>
-                            <span>{album.tracks.length} tracks</span>
-                            <Badge variant={album.source === "spotify" ? "default" : album.source === "apple_music" ? "secondary" : "outline"} className="text-[10px]">
-                              {album.source === "spotify" ? "Spotify" : album.source === "apple_music" ? "Apple Music" : "Uploaded"}
-                            </Badge>
-                          </div>
-                        </div>
-                        {album.externalUrl && (
-                          <a href={album.externalUrl} target="_blank" rel="noopener noreferrer" className="text-stone-400 hover:text-olive-600">
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
-                      </div>
-                      <div className="rounded-lg border border-stone-100 divide-y divide-stone-100">
-                        {album.tracks.map((track) => (
-                          <div key={track.id} className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-sand-100">
-                            <span className="w-6 text-center text-xs text-stone-400">{track.trackNumber}</span>
-                            {track.previewUrl ? (
-                              <button className="text-olive-600 hover:text-olive-800"><Play className="h-3.5 w-3.5" /></button>
-                            ) : (
-                              <span className="w-3.5" />
-                            )}
-                            <span className="flex-1 text-stone-700">{track.title}</span>
-                            {track.genre && <span className="text-xs text-stone-400 hidden sm:block">{track.genre}</span>}
-                            <span className="text-xs text-stone-400">{formatDuration(track.duration)}</span>
-                          </div>
-                        ))}
-                      </div>
+                  {artist.discography.length === 0 && (
+                    <div className="empty-state">
+                      <AudioLines className="mx-auto mb-4 h-8 w-8 text-brand" />
+                      <h3 className="font-semibold text-ink">A portfolio in the making</h3>
+                      <p className="mt-2 text-sm leading-6 text-muted">Work samples haven&apos;t been added yet. Explore their links for more of their creative world.</p>
                     </div>
+                  )}
+                  {artist.discography.map((album) => (
+                    <article key={album.id} className="overflow-hidden rounded-2xl border border-line">
+                      <div className="flex items-center gap-4 bg-page/40 p-4 sm:p-5">
+                        <ProfileArtwork src={album.coverArt} alt={`${album.title} artwork`} sizes="80px" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand sm:h-20 sm:w-20"><Music2 className="h-7 w-7" /></ProfileArtwork>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="break-words text-base font-semibold text-ink sm:text-lg">{album.title}</h3>
+                          <p className="mt-1 text-xs text-muted">{album.releaseYear} · {album.tracks.length} {album.tracks.length === 1 ? "track" : "tracks"}</p>
+                          {album.externalUrl && <a href={album.externalUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">Listen on {album.source === "spotify" ? "Spotify" : album.source === "apple_music" ? "Apple Music" : "release page"} <ExternalLink className="h-3 w-3" /></a>}
+                        </div>
+                      </div>
+                      <ol className="divide-y divide-line/60">
+                        {[...album.tracks].sort((a, b) => a.trackNumber - b.trackNumber).map((track) => (
+                          <li key={track.id} className="px-4 py-3 sm:px-5">
+                            <div className="flex items-center gap-3 text-sm">
+                              <span className="w-5 shrink-0 text-xs tabular-nums text-muted">{String(track.trackNumber).padStart(2, "0")}</span>
+                              <span className="min-w-0 flex-1 break-words font-medium text-ink">{track.title}</span>
+                              {track.genre && <span className="hidden text-xs text-muted sm:block">{track.genre}</span>}
+                              <span className="shrink-0 text-xs tabular-nums text-muted">{track.duration > 0 ? formatDuration(track.duration) : "—"}</span>
+                            </div>
+                            {track.previewUrl && <audio controls preload="none" aria-label={`Preview ${track.title}`} className="mt-3 h-9 w-full" src={track.previewUrl} />}
+                          </li>
+                        ))}
+                      </ol>
+                    </article>
                   ))}
                 </CardContent>
               </Card>
 
-              {/* Reviews */}
-              <Card>
-                <CardHeader><CardTitle>Reviews ({mockReviews.length})</CardTitle></CardHeader>
+              <Card id="rider" className="profile-section">
+                <CardHeader><p className="eyebrow">Before the show</p><CardTitle className="flex items-center gap-2 text-xl leading-tight sm:text-2xl"><SlidersHorizontal className="h-5 w-5 text-brand" />Technical rider</CardTitle></CardHeader>
+                <CardContent>
+                  <p className="mb-5 text-sm leading-6 text-muted">Equipment this artist asks the venue to provide. Compatibility is checked when you start a booking.</p>
+                  {profile.equipmentNeeds.length > 0 ? (
+                    <ul className="divide-y divide-line rounded-xl border border-line px-4">
+                      {profile.equipmentNeeds.map((need) => <li key={need.id} className="flex items-start gap-4 py-4"><span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-brand-soft px-2 text-sm font-semibold text-brand">{need.quantity}×</span><div className="min-w-0"><p className="text-sm font-medium text-ink">{need.equipment.name}</p><p className="mt-1 break-words text-xs leading-5 text-muted">{need.notes || need.equipment.category}</p></div></li>)}
+                    </ul>
+                  ) : <p className="rounded-xl bg-page/50 p-4 text-sm leading-6 text-muted">No equipment requirements listed yet. Confirm the setup directly before booking.</p>}
+                  {profile.equipmentOwned.length > 0 && <div className="mt-6 border-t border-line pt-5"><h3 className="mb-3 text-sm font-semibold">Equipment the artist can bring</h3><ul className="space-y-2 text-sm text-muted">{profile.equipmentOwned.map((item) => <li key={item.id}>{item.quantity}× {item.equipment.name}</li>)}</ul></div>}
+                </CardContent>
+              </Card>
+
+              {artist.credentials.length > 0 && (
+                <Card>
+                  <CardHeader><p className="eyebrow">Background & craft</p><CardTitle className="text-xl leading-tight sm:text-2xl">Credentials</CardTitle></CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-2">
+                    {artist.credentials.map((credential) => <div key={credential.id} className="flex items-start gap-3 rounded-xl border border-line p-4"><Award className="mt-0.5 h-5 w-5 shrink-0 text-brand" /><div className="min-w-0"><p className="break-words text-sm font-semibold text-ink">{credential.title}</p><p className="mt-1 text-xs leading-5 text-muted">{[credential.issuer, credential.year].filter(Boolean).join(" · ")}</p><p className="mt-1 text-xs capitalize text-muted">{credential.type}</p></div></div>)}
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card id="reviews" className="profile-section">
+                <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow mb-2">From the people they work with</p><CardTitle className="text-xl leading-tight sm:text-2xl">Client reviews</CardTitle></div><Badge variant="outline">{reviews.length} {reviews.length === 1 ? "review" : "reviews"}</Badge></CardHeader>
                 <CardContent className="space-y-6">
-                  {mockReviews.map((review) => (
-                    <div key={review.id} className="border-b border-stone-100 pb-4 last:border-0 last:pb-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="font-medium text-sm text-stone-900">{review.reviewer?.name}</span>
-                          {review.reviewer?.venueName && (
-                            <span className="text-xs text-stone-400 ml-2">— {review.reviewer.venueName}</span>
-                          )}
-                        </div>
+                  {reviews.length === 0 && <div className="empty-state"><Star className="mx-auto mb-4 h-8 w-8 text-brand" /><h3 className="font-semibold text-ink">New connections start here</h3><p className="mt-2 text-sm leading-6 text-muted">No reviews yet. Get to know their work, not just their review count.</p></div>}
+                  {reviews.map((review) => (
+                    <article key={review.id} className="border-b border-line pb-6 last:border-0 last:pb-0">
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div><h3 className="text-sm font-semibold text-ink">{review.reviewer.venueProfile?.venueName || review.reviewer.name || "Client"}</h3><p className="mt-1 text-xs text-muted">{dateFormat.format(review.createdAt)}</p></div>
                         <StarRating rating={review.rating} size="sm" />
                       </div>
-                      <p className="text-sm text-stone-600">{review.comment}</p>
-                      <span className="mt-1 block text-xs text-stone-400">{new Date(review.createdAt).toLocaleDateString()}</span>
-                    </div>
+                      <p className="whitespace-pre-line break-words text-sm leading-7 text-muted">{review.comment || "This client left a rating without a written review."}</p>
+                    </article>
                   ))}
                 </CardContent>
               </Card>
             </div>
 
-            {/* Right sidebar (1/3) */}
-            <div className="space-y-6">
-              {/* Booking CTA */}
-              <Card id="book" className="border-olive-200">
-                <CardHeader>
-                  <CardTitle>Book {artist.stageName}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-stone-500">Send a booking request with your project details. They&apos;ll respond within 48 hours.</p>
-                  <Button className="w-full" asChild>
-                    <Link href="/register">Request Booking</Link>
-                  </Button>
-                  <p className="text-xs text-center text-stone-400">Sign in or create an account to book · 5% platform fee applies</p>
-                </CardContent>
-              </Card>
-
-              {/* Quick info */}
+            <aside className="min-w-0 space-y-5 lg:sticky lg:top-24" aria-label="Booking and artist details">
+              {[artist.performanceFee, artist.hourlyFee, artist.dayFee].some((rate) => rate != null) && <Card><CardHeader><CardTitle className="text-base">Quoted fees</CardTitle></CardHeader><CardContent><dl className="space-y-3 text-sm">{[["Performance", artist.performanceFee], ["Per hour", artist.hourlyFee], ["Per day", artist.dayFee]].map(([label, fee]) => typeof fee === "number" ? <div key={String(label)} className="flex justify-between gap-3"><dt className="text-muted">{label}</dt><dd className="font-semibold text-brand">{formatMoney(fee)}</dd></div> : null)}</dl><p className="mt-4 text-xs leading-5 text-muted">Starting rates; confirm the project scope and agreed fee before booking.</p></CardContent></Card>}
+              <BookingRequestCard musicianId={artist.id} stageName={artist.stageName} isSignedInVenue={isSignedInVenue} />
               <Card>
-                <CardHeader><CardTitle>Quick Info</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-stone-500">Rating</span>
-                    <span className="font-medium">{artist.rating} / 5</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-stone-500">Projects completed</span>
-                    <span className="font-medium">{artist.reviewCount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-stone-500">Experience</span>
-                    <span className="font-medium">{artist.experienceYears} years</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-stone-500">Location</span>
-                    <span className="font-medium">{artist.location}</span>
-                  </div>
+                <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calendar className="h-4 w-4 text-brand" />Availability</CardTitle></CardHeader>
+                <CardContent>
+                  {upcomingAvailability.length > 0 ? <ul className="space-y-3">{upcomingAvailability.slice(0, 3).map((slot) => <li key={slot.id} className="rounded-xl border border-line bg-page/30 px-3 py-3 text-sm text-ink"><span className="mb-1 block text-xs text-muted">Listed availability</span>{dateFormat.format(new Date(slot.startDate))}<span className="px-1 text-muted">–</span>{dateFormat.format(new Date(slot.endDate))}</li>)}</ul> : <p className="text-sm leading-6 text-muted">No upcoming dates listed. Send a request to check availability for your project.</p>}
+                  {upcomingAvailability.length > 0 && <p className="mt-3 text-xs leading-5 text-muted">Dates are artist-provided. Your booking is confirmed only after acceptance and successful payment.</p>}
                 </CardContent>
               </Card>
-
-              {/* Social links */}
-              <Card>
-                <CardHeader><CardTitle>Links</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                  {Object.entries(artist.socialLinks).map(([key, url]) => (
-                    url && (
-                      <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-olive-600 hover:underline capitalize">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        {key}
-                      </a>
-                    )
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
+              {links.length > 0 && <Card><CardHeader><CardTitle className="text-base">Elsewhere on the web</CardTitle></CardHeader><CardContent className="space-y-2">{links.map(([key, url]) => <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-xl border border-line px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-brand hover:bg-brand-soft"><span className="capitalize">{key === "appleMusic" ? "Apple Music" : key}</span><ArrowUpRight className="h-4 w-4 text-brand" /></a>)}</CardContent></Card>}
+              <Link href="/artists" className="flex items-center justify-center gap-2 py-2 text-sm font-medium text-muted hover:text-brand">Explore more creatives <ArrowUpRight className="h-4 w-4" /></Link>
+            </aside>
           </div>
         </div>
       </main>

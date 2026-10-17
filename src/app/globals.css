@@ -77,11 +77,54 @@ body {
   .panel-soft {
     @apply rounded-2xl border border-line bg-surface shadow-[0_24px_70px_-45px_rgba(47,59,29,0.55)];
   }
+
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-brand;
+  }
+
+
+  .profile-section {
+    @apply scroll-mt-24 rounded-2xl;
+  }
+
+  .empty-state {
+    @apply rounded-2xl border border-dashed border-line-strong bg-page/30 px-5 py-10 text-center;
+  }
+
+  .page-intro {
+    @apply relative overflow-hidden rounded-3xl border border-line bg-surface px-6 py-8 sm:px-10 sm:py-12;
+  }
+
+  .dashboard-shell > div {
+    @apply min-w-0 pt-16 lg:pt-0;
+  }
+
+  .dashboard-shell > div > main,
+  .dashboard-shell > div > div {
+    @apply min-w-0;
+  }
 }
 
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+}
+
+:where(a, button, input, select, textarea, audio):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Hide scrollbar but keep functionality */

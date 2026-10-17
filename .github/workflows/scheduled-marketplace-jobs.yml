@@ -1,0 +1,49 @@
+name: Scheduled marketplace jobs
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-scheduled-jobs
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CRON_SECRET: ${{ secrets.MARKETPLACE_CRON_SECRET }}
+      SITE_ORIGIN: https://stagelynk.co
+    steps:
+      - name: Validate scheduler configuration
+        shell: bash
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            printf '%s\n' 'MARKETPLACE_CRON_SECRET is not configured.' >&2
+            exit 1
+          fi
+      - name: Reconcile expired open-call payments
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_ORIGIN/api/cron/open-call-payments"
+      - name: Expire direct booking offers
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_ORIGIN/api/cron/booking-expiry"
+      - name: Release eligible payouts
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_ORIGIN/api/cron/payout-release"

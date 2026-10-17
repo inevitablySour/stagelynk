@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
-import { musicianProfileSchema } from "@/lib/validations";
+import { prisma } from "@/lib/db";
+import { serializeMusicianProfile } from "@/lib/serializers";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  // TODO: Replace with prisma lookup
-  return NextResponse.json({ success: true, data: { id } });
-}
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const body = await request.json();
-  const parsed = musicianProfileSchema.partial().safeParse(body);
+  const profile = await prisma.musicianProfile.findUnique({
+    where: { id, user: { deletedAt: null } },
+    include: {
+      genres: { include: { genre: true } },
+      albums: { include: { tracks: true } },
+      credentials: true,
+      availabilitySlots: true,
+    },
+  });
 
-  if (!parsed.success) {
-    return NextResponse.json({ success: false, message: "Invalid musician profile update", errors: parsed.error.flatten() }, { status: 400 });
+  if (!profile) {
+    return NextResponse.json({ success: false, message: "Musician not found" }, { status: 404 });
   }
 
-  // TODO: Update musician profile in database
-  return NextResponse.json({ success: true, data: { id, ...parsed.data } });
+  return NextResponse.json({ success: true, data: serializeMusicianProfile(profile) });
 }

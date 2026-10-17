@@ -1,12 +1,33 @@
-import { Upload } from "lucide-react";
+import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { DASHBOARD_NAV_MUSICIAN, GENRES } from "@/config";
+import { DASHBOARD_NAV_MUSICIAN } from "@/config";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { MusicianProfileForm } from "@/components/dashboard/musician-profile-form";
+import { MusicianSocialForm } from "@/components/dashboard/musician-social-form";
+import { EquipmentChecklist } from "@/components/equipment/equipment-checklist";
+import { CredentialsManager } from "@/components/dashboard/credentials-manager";
+import { AvailabilityManager } from "@/components/dashboard/availability-manager";
+import { ArtistDiscoveryDetailsForm } from "@/components/dashboard/artist-discovery-details-form";
+import type { SocialLinks } from "@/types";
 
-export default function MusicianProfilePage() {
+export default async function MusicianProfilePage() {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+
+  const profile = await prisma.musicianProfile.findUnique({
+    where: { userId: session.user.id },
+    include: {
+      genres: { include: { genre: true } },
+      equipmentNeeds: true,
+      equipmentOwned: true,
+      credentials: true,
+      availabilitySlots: true,
+    },
+  });
+
+  if (!profile) redirect("/musician");
+
   return (
     <div className="flex min-h-screen bg-sand-100">
       <Sidebar role="musician" navItems={DASHBOARD_NAV_MUSICIAN} />
@@ -15,59 +36,40 @@ export default function MusicianProfilePage() {
           <h1 className="text-2xl font-bold text-stone-900">Creative Profile</h1>
           <p className="mt-1 text-stone-500">Manage how clients see you in search and on your public profile.</p>
 
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Profile Details</CardTitle>
-              <CardDescription>Keep your bio, location, and skills current.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Stage name</label>
-                  <Input defaultValue="Nova Eclipse" />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Location</label>
-                  <Input defaultValue="London, UK" />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Bio</label>
-                <textarea
-                  className="min-h-32 w-full rounded-lg border border-stone-300 bg-sand-50 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-olive-500"
-                  defaultValue="Electronic music producer blending ambient textures with driving beats."
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium">Genres</label>
-                <div className="flex flex-wrap gap-2">
-                  {GENRES.slice(0, 12).map((genre) => (
-                    <Badge key={genre.slug} variant={["electronic", "indie", "pop"].includes(genre.slug) ? "default" : "outline"}>
-                      {genre.name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Button variant="outline" type="button"><Upload className="mr-2 h-4 w-4" /> Profile image</Button>
-                <Button variant="outline" type="button"><Upload className="mr-2 h-4 w-4" /> Banner image</Button>
-                <Button type="button">Save profile</Button>
-              </div>
-            </CardContent>
-          </Card>
+          <MusicianProfileForm
+            initial={{
+              stageName: profile.stageName,
+              bio: profile.bio,
+              location: profile.location,
+              experienceYears: profile.experienceYears,
+              genreSlugs: profile.genres.map((mg) => mg.genre.slug),
+              instruments: profile.instruments,
+            }}
+          />
 
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Social & Portfolio Links</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div><label className="mb-1.5 block text-sm font-medium">Website</label><Input placeholder="https://your-site.com" /></div>
-              <div><label className="mb-1.5 block text-sm font-medium">Instagram</label><Input placeholder="@artistname" /></div>
-              <div><label className="mb-1.5 block text-sm font-medium">Spotify</label><Input placeholder="Spotify artist URL" /></div>
-              <div><label className="mb-1.5 block text-sm font-medium">Apple Music</label><Input placeholder="Apple Music artist URL" /></div>
-              <Button className="sm:col-span-2" type="button">Save links</Button>
-            </CardContent>
-          </Card>
+          <MusicianSocialForm initial={(profile.socialLinks as SocialLinks) ?? {}} />
+          <ArtistDiscoveryDetailsForm initial={{
+            primaryCategory: profile.primaryCategory, subgenres: profile.subgenres, influences: profile.influences,
+            favorites: profile.favorites, performanceFee: profile.performanceFee, hourlyFee: profile.hourlyFee,
+            dayFee: profile.dayFee, profileImage: profile.profileImage, bannerImage: profile.bannerImage,
+          }} />
+          <EquipmentChecklist title="Equipment I can bring" description="Your own equipment, separate from what you need a venue to provide." mode="offerings" endpoint="/api/musicians/me/equipment-owned" initial={profile.equipmentOwned} />
+
+          <CredentialsManager
+            initial={profile.credentials.map((c) => ({ id: c.id, type: c.type, title: c.title, issuer: c.issuer, year: c.year ?? undefined }))}
+          />
+
+          <AvailabilityManager
+            initial={profile.availabilitySlots.map((s) => ({ id: s.id, startDate: s.startDate.toISOString(), endDate: s.endDate.toISOString() }))}
+          />
+
+          <EquipmentChecklist
+            title="Technical rider"
+            description="List the equipment you need venues to provide for a live performance. Venues will see a gap alert if they can't fully cover your rider."
+            mode="needs"
+            endpoint="/api/musicians/me/equipment"
+            initial={profile.equipmentNeeds.map((n) => ({ equipmentId: n.equipmentId, quantity: n.quantity, notes: n.notes }))}
+          />
         </div>
       </main>
     </div>

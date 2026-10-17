@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { UserRole } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { getRequestMetadata } from "@/lib/request-context";
 import { writeAuditLog } from "@/lib/audit-log";
 
@@ -9,6 +10,15 @@ export async function requireAuth(options: { roles?: UserRole[]; redirectTo?: st
 
   if (!session?.user) {
     redirect(options.redirectTo ?? "/login");
+  }
+
+  const activeUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { deletedAt: true },
+  });
+
+  if (!activeUser || activeUser.deletedAt) {
+    redirect("/api/auth/signout-deleted");
   }
 
   if (options.roles?.length && !options.roles.includes(session.user.role)) {

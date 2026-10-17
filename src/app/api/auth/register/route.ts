@@ -6,6 +6,8 @@ import { hashPassword } from "@/lib/password";
 import { registerSchema } from "@/lib/validations";
 import { getRequestMetadataFromHeaders } from "@/lib/request-context";
 import { writeAuditLog } from "@/lib/audit-log";
+import { sendWelcomeEmail } from "@/lib/email-templates";
+import { CURRENT_TERMS_VERSION } from "@/config";
 
 const log = getLogger("api-auth-register");
 
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.json(
-        { success: false, message: "Unable to create an account with those details." },
+        { success: false, message: "An account with this email already exists. Try signing in instead." },
         { status: 400 }
       );
     }
@@ -69,6 +71,8 @@ export async function POST(request: NextRequest) {
         email,
         passwordHash,
         role,
+        termsAcceptedAt: new Date(),
+        termsVersion: CURRENT_TERMS_VERSION,
         musicianProfile:
           role === "musician"
             ? {
@@ -104,8 +108,12 @@ export async function POST(request: NextRequest) {
       requestId: requestMetadata.requestId,
       targetType: "User",
       targetId: user.id,
-      metadata: { provider: "credentials", role: user.role },
+      metadata: { provider: "credentials", role: user.role, termsVersion: CURRENT_TERMS_VERSION },
     });
+
+    sendWelcomeEmail({ email: user.email, name }, user.role === "venue" ? "venue" : "musician").catch((err) =>
+      log.error({ err }, "Failed to send welcome email")
+    );
 
     return NextResponse.json(
       {
