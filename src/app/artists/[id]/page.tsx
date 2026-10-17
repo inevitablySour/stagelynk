@@ -16,6 +16,8 @@ import { ProfileArtwork } from "@/components/artists/profile-artwork";
 import { CREATIVE_CATEGORIES } from "@/config";
 import type { SocialLinks } from "@/types";
 import { formatMoney } from "@/lib/marketplace-fees";
+import { SpotifyPlayer } from "@/components/artists/spotify-player";
+import { spotifyEmbedUrl } from "@/lib/spotify-embed";
 
 function formatDuration(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -143,7 +145,11 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                           {album.externalUrl && <a href={album.externalUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">Listen on {album.source === "spotify" ? "Spotify" : album.source === "apple_music" ? "Apple Music" : "release page"} <ExternalLink className="h-3 w-3" /></a>}
                         </div>
                       </div>
-                      <ol className="divide-y divide-line/60">
+                      {spotifyEmbedUrl(album.externalUrl) ? (
+                        <div className="border-t border-line bg-page/20 p-3 sm:p-4">
+                          <SpotifyPlayer url={album.externalUrl} title={album.title} />
+                        </div>
+                      ) : <ol className="divide-y divide-line/60">
                         {[...album.tracks].sort((a, b) => a.trackNumber - b.trackNumber).map((track) => (
                           <li key={track.id} className="px-4 py-3 sm:px-5">
                             <div className="flex items-center gap-3 text-sm">
@@ -152,10 +158,9 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                               {track.genre && <span className="hidden text-xs text-muted sm:block">{track.genre}</span>}
                               <span className="shrink-0 text-xs tabular-nums text-muted">{track.duration > 0 ? formatDuration(track.duration) : "—"}</span>
                             </div>
-                            {track.previewUrl && <audio controls preload="none" aria-label={`Preview ${track.title}`} className="mt-3 h-9 w-full" src={track.previewUrl} />}
                           </li>
                         ))}
-                      </ol>
+                      </ol>}
                     </article>
                   ))}
                 </CardContent>

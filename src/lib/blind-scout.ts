@@ -1,4 +1,5 @@
 import type { MusicianProfile } from "@/types";
+import { spotifyEmbedUrl } from "@/lib/spotify-embed";
 
 /**
  * Deterministic per-day rotation seed so the same "random" order holds for
@@ -29,7 +30,7 @@ export function rankBlindScout(artists: MusicianProfile[], activeGenreSlugs: str
       const genreMatchCount = activeGenreSlugs.length
         ? artist.genres.filter((g) => activeGenreSlugs.includes(g.slug)).length
         : 0;
-      const hasPortfolio = artist.discography.some((album) => album.tracks.some((track) => Boolean(track.previewUrl))) ? 1 : 0;
+      const hasPortfolio = artist.discography.some((album) => album.tracks.some((track) => Boolean(track.previewUrl)) || (album.source === "spotify" && Boolean(spotifyEmbedUrl(album.externalUrl)))) ? 1 : 0;
       const rotation = dailyRotationSeed(artist.id) % 1000;
 
       return { artist, genreMatchCount, hasPortfolio, rotation };

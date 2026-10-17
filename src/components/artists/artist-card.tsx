@@ -8,6 +8,8 @@ import type { MusicianProfile } from "@/types";
 import { ProfileArtwork } from "@/components/artists/profile-artwork";
 import { CREATIVE_CATEGORIES } from "@/config";
 import { formatMoney } from "@/lib/marketplace-fees";
+import { SpotifyPlayer } from "@/components/artists/spotify-player";
+import { spotifyEmbedUrl } from "@/lib/spotify-embed";
 
 interface ArtistCardProps {
   artist: MusicianProfile;
@@ -16,7 +18,7 @@ interface ArtistCardProps {
 
 export function ArtistCard({ artist, blindScout = false }: ArtistCardProps) {
   const category = CREATIVE_CATEGORIES.find((item) => item.slug === artist.primaryCategory)?.name ?? "Creative";
-  const sample = artist.discography.flatMap((album) => album.tracks).find((track) => track.previewUrl);
+  const spotifyAlbum = artist.discography.find((album) => album.source === "spotify" && spotifyEmbedUrl(album.externalUrl));
   return (
     <article className="group min-w-0 h-full rounded-2xl">
       <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl transition-all group-hover:-translate-y-1 group-hover:border-brand/40 group-hover:shadow-[0_20px_55px_-30px_rgba(47,59,29,0.35)]">
@@ -51,7 +53,7 @@ export function ArtistCard({ artist, blindScout = false }: ArtistCardProps) {
           </div>
           <p className="mt-4 line-clamp-2 text-sm leading-6 text-muted">{artist.bio || "A new creative connection waiting to happen. Get to know their work."}</p>
           {artist.performanceFee != null && <p className="mt-3 text-xs font-semibold text-brand">From {formatMoney(artist.performanceFee)} / performance</p>}
-          {blindScout && <div className="relative z-10 mt-4 rounded-xl bg-page/40 p-3">{sample ? <><p className="mb-2 truncate text-xs font-medium text-ink">{sample.title}</p><audio controls preload="none" src={sample.previewUrl} aria-label={`Listen to ${artist.stageName}: ${sample.title}`} className="h-9 w-full" /></> : <p className="text-xs leading-5 text-muted">No audio sample yet. Explore their profile and creative influences.</p>}</div>}
+          {blindScout && <div className="relative z-10 mt-4">{spotifyAlbum ? <SpotifyPlayer url={spotifyAlbum.externalUrl} title={spotifyAlbum.title} compact /> : <p className="rounded-xl bg-page/40 p-3 text-xs leading-5 text-muted">No Spotify release linked yet. Explore their profile and creative influences.</p>}</div>}
 
           {/* Genre tags */}
           <div className="mt-4 mb-5 flex flex-wrap gap-1.5">
