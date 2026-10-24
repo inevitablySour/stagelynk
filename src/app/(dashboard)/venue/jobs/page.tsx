@@ -24,7 +24,7 @@ export default async function VenueJobsPage() {
       <Sidebar role="venue" navItems={DASHBOARD_NAV_VENUE} />
       <main className="flex-1 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
-          <OpenCallsManager listings={listings.map(serializeCall)} />
+          <OpenCallsManager listings={listings.map((listing) => serializeCall(listing))} />
         </div>
       </main>
     </div>

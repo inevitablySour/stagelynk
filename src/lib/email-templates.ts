@@ -4,7 +4,7 @@ import { formatMoney } from "@/lib/marketplace-fees";
 import { APP_NAME } from "@/config";
 
 function appUrl(path: string) {
-  const origin = new URL(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "https://stagelynk.co").origin;
+  const origin = new URL(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "https://www.indiecentral.eu").origin;
   return new URL(path, origin).toString();
 }
 
@@ -31,7 +31,7 @@ export async function sendPasswordResetEmail(to: Recipient, token: string) {
     text: `Reset your password using this single-use link, valid for 30 minutes: ${url}\n\nIf you did not request this, ignore this email. Your password has not changed.`,
     html: renderEmailHtml({
       heading: "Reset your password",
-      bodyHtml: "<p>We received a request to reset your StageLynk password.</p><p>This link can be used once and expires in 30 minutes. If you did not request a reset, you can safely ignore this email.</p>",
+      bodyHtml: `<p>We received a request to reset your ${APP_NAME} password.</p><p>This link can be used once and expires in 30 minutes. If you did not request a reset, you can safely ignore this email.</p>`,
       button: { label: "Choose a new password", url },
     }),
   });
@@ -42,10 +42,10 @@ export async function sendPasswordChangedEmail(to: Recipient) {
     from: { email: MAIL_FROM.accounts, name: `${APP_NAME} Accounts` },
     to: [to],
     subject: `Your ${APP_NAME} password was changed`,
-    text: `Your password was changed and existing sessions were signed out. If this was not you, contact support@stagelynk.co immediately.`,
+    text: `Your password was changed and existing sessions were signed out. If this was not you, contact ${MAIL_FROM.support} immediately.`,
     html: renderEmailHtml({
       heading: "Your password was changed",
-      bodyHtml: "<p>Your password has been changed. Existing sessions have been invalidated.</p><p>If this wasn't you, contact support@stagelynk.co immediately.</p>",
+      bodyHtml: `<p>Your password has been changed. Existing sessions have been invalidated.</p><p>If this wasn't you, contact ${MAIL_FROM.support} immediately.</p>`,
       button: { label: "Contact support", url: appUrl("/contact") },
     }),
   });
@@ -231,6 +231,43 @@ export async function sendJobApplicationStatusEmail(
         ? `<p><strong>${details.venueName}</strong> accepted your application for <strong>"${details.jobTitle}"</strong>.</p>`
         : `<p><strong>${details.venueName}</strong> declined your application for <strong>"${details.jobTitle}"</strong>.</p>`,
       button: { label: "View applications", url: appUrl("/musician/applications") },
+    }),
+  });
+}
+
+export async function sendDisputeFiledEmail(
+  to: Recipient,
+  details: { otherPartyName: string; bookingTitle: string; reason: string; responseDeadline: Date }
+) {
+  await sendEmail({
+    from: { email: MAIL_FROM.noreply, name: APP_NAME },
+    to: [to],
+    subject: `${details.otherPartyName} filed a dispute on "${details.bookingTitle}"`,
+    text: `${details.otherPartyName} filed a dispute on your booking "${details.bookingTitle}": ${details.reason}\n\nRespond before ${details.responseDeadline.toLocaleString()}.`,
+    html: renderEmailHtml({
+      heading: "A dispute was filed",
+      bodyHtml: `<p><strong>${details.otherPartyName}</strong> filed a dispute on <strong>"${details.bookingTitle}"</strong>.</p>
+        <p>${details.reason}</p>
+        <p>Please respond before <strong>${details.responseDeadline.toLocaleString()}</strong>.</p>`,
+      button: { label: "Respond to dispute", url: appUrl("/settings") },
+    }),
+  });
+}
+
+export async function sendDisputeResolvedEmail(
+  to: Recipient,
+  details: { bookingTitle: string; resolution: string; resolutionNotes: string }
+) {
+  await sendEmail({
+    from: { email: MAIL_FROM.noreply, name: APP_NAME },
+    to: [to],
+    subject: `Dispute resolved for "${details.bookingTitle}"`,
+    text: `The dispute on "${details.bookingTitle}" has been resolved: ${details.resolution}.\n\n${details.resolutionNotes}`,
+    html: renderEmailHtml({
+      heading: "Dispute resolved",
+      bodyHtml: `<p>The dispute on <strong>"${details.bookingTitle}"</strong> has been resolved: <strong>${details.resolution}</strong>.</p>
+        <p>${details.resolutionNotes}</p>`,
+      button: { label: "View booking", url: appUrl("/settings") },
     }),
   });
 }

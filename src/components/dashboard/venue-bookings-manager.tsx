@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney, calculateMarketplaceFees } from "@/lib/marketplace-fees";
+import { DisputeBanner } from "@/components/dashboard/dispute-banner";
 import type { BookingStatus, PayoutStatus } from "@/types";
 
 export interface VenueBookingRow {
@@ -159,6 +160,9 @@ export function VenueBookingsManager({ bookings }: { bookings: VenueBookingRow[]
                     )}
                   </div>
                 </div>
+                {(b.status === "accepted" || b.status === "completed") && b.paymentStatus === "paid" && (
+                  <DisputeBanner bookingId={b.id} viewerRole="venue" canFile />
+                )}
                 {hasCounter && (
                   <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                     <Handshake className="h-4 w-4 shrink-0" />

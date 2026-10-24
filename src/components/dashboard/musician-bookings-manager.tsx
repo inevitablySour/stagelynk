@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney, calculateMarketplaceFees } from "@/lib/marketplace-fees";
+import { APP_NAME } from "@/config";
+import { DisputeBanner } from "@/components/dashboard/dispute-banner";
 import type { BookingStatus } from "@/types";
 
 export interface BookingRow {
@@ -174,7 +176,7 @@ export function MusicianBookingsManager({ bookings }: { bookings: BookingRow[] }
                       <h4 className="text-sm font-semibold text-stone-900 mb-3">Payment Details</h4>
                       <dl className="space-y-2 text-sm">
                         <div className="flex justify-between"><dt className="text-stone-500">Performance fee</dt><dd className="font-medium">{formatMoney(fees.performanceFee, fees.currency)}</dd></div>
-                        <div className="flex justify-between"><dt className="text-stone-500">StageLynk fee ({(fees.platformFeeRate * 100).toFixed(0)}%)</dt><dd className="text-stone-400">−{formatMoney(fees.platformFeeAmount, fees.currency)}</dd></div>
+                        <div className="flex justify-between"><dt className="text-stone-500">{APP_NAME} fee ({(fees.platformFeeRate * 100).toFixed(0)}%)</dt><dd className="text-stone-400">−{formatMoney(fees.platformFeeAmount, fees.currency)}</dd></div>
                         <div className="flex justify-between"><dt className="text-stone-500">Processing est.</dt><dd className="text-stone-400">−{formatMoney(fees.processorFeeEstimate, fees.currency)}</dd></div>
                         {booking.depositAmount > 0 && <div className="flex justify-between"><dt className="text-stone-500">Deposit</dt><dd className="font-medium">{formatMoney(booking.depositAmount, booking.currency)}</dd></div>}
                         <hr className="border-line" />
@@ -294,6 +296,9 @@ export function MusicianBookingsManager({ bookings }: { bookings: BookingRow[] }
                         <Mic2 className="mr-1 h-4 w-4" /> Mark Completed
                       </Button>
                     </div>
+                  )}
+                  {(booking.status === "accepted" || booking.status === "completed") && booking.paymentStatus === "paid" && (
+                    <DisputeBanner bookingId={booking.id} viewerRole="musician" canFile />
                   )}
                 </CardContent>
               )}
