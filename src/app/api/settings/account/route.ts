@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { z } from "zod/v4";
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getLogger } from "@/lib/logger";
@@ -8,6 +9,54 @@ import { writeAuditLog } from "@/lib/audit-log";
 import { sendAccountDeletionEmail } from "@/lib/email-templates";
 
 const log = getLogger("api-settings-account");
+
+const accountInfoSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(120).optional(),
+  location: z.string().trim().max(120).optional(),
+});
+
+export async function PATCH(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ success: false, message: "Not signed in." }, { status: 401 });
+  }
+
+  const parsed = accountInfoSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ success: false, message: "Invalid account details", errors: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const { name, location } = parsed.data;
+  const userId = session.user.id;
+
+  await prisma.$transaction(async (tx) => {
+    if (name !== undefined) {
+      await tx.user.update({ where: { id: userId }, data: { name } });
+    }
+    if (location !== undefined) {
+      if (session.user.role === "musician") {
+        await tx.musicianProfile.updateMany({ where: { userId }, data: { location } });
+      } else if (session.user.role === "venue") {
+        await tx.venueProfile.updateMany({ where: { userId }, data: { location } });
+      }
+    }
+  });
+
+  const requestMetadata = getRequestMetadataFromHeaders(request.headers);
+  await writeAuditLog({
+    event: "account_info_updated",
+    category: "profile",
+    level: "info",
+    actorUserId: userId,
+    ipAddress: requestMetadata.ipAddress,
+    userAgent: requestMetadata.userAgent,
+    requestId: requestMetadata.requestId,
+    targetType: "User",
+    targetId: userId,
+  });
+
+  return NextResponse.json({ success: true });
+}
 
 export async function DELETE(request: NextRequest) {
   const session = await auth();

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Calendar, Star, Search, DollarSign, Briefcase, Megaphone } from "lucide-react";
+import { Calendar, Star, Search, DollarSign, Briefcase, Megaphone, Building2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,18 +67,24 @@ export default async function VenueDashboard() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-sand-100">
+    <div className="flex min-h-screen section-muted">
       <Sidebar role="venue" navItems={DASHBOARD_NAV_VENUE} />
       <div className="flex-1 lg:pl-0">
         <div className="px-4 py-8 sm:px-6 lg:px-8 max-w-6xl mx-auto">
-          <div className="mb-8"><h1 className="text-2xl font-bold text-stone-900">Venue Dashboard</h1><p className="text-stone-500 mt-1">{venue.venueName}</p></div>
+          <section className="page-intro mb-8">
+            <Building2 aria-hidden="true" className="pointer-events-none absolute -right-5 top-6 hidden h-48 w-48 rotate-12 text-brand/5 sm:block" />
+            <div className="relative">
+              <p className="eyebrow mb-3">Venue dashboard</p>
+              <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{venue.venueName}</h1>
+            </div>
+          </section>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-            {stats.map((stat) => (<Card key={stat.label}><CardContent className="p-5"><div className="flex items-center justify-between"><span className="text-sm text-stone-500">{stat.label}</span><stat.icon className="h-4 w-4 text-olive-500" /></div><div className="mt-2 text-2xl font-bold text-stone-900">{stat.value}</div><p className="text-xs text-stone-400 mt-1">{stat.change}</p></CardContent></Card>))}
+            {stats.map((stat) => (<Card key={stat.label} className="panel-soft"><CardContent className="p-5"><div className="flex items-center justify-between"><span className="text-sm text-stone-500">{stat.label}</span><stat.icon className="h-4 w-4 text-olive-500" /></div><div className="mt-2 text-2xl font-bold text-stone-900">{stat.value}</div><p className="text-xs text-stone-400 mt-1">{stat.change}</p></CardContent></Card>))}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
+            <Card className="panel-soft lg:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between"><CardTitle>Recent Bookings</CardTitle><Button variant="ghost" size="sm" asChild><Link href="/venue/bookings">View all</Link></Button></CardHeader>
               <CardContent>
                 {recentBookings.length === 0 ? (
@@ -97,7 +103,7 @@ export default async function VenueDashboard() {
             </Card>
 
             <div className="space-y-6">
-              <Card>
+              <Card className="panel-soft">
                 <CardHeader><CardTitle>Spend Summary</CardTitle></CardHeader>
                 <CardContent>
                   <dl className="space-y-2 text-sm">
@@ -108,7 +114,7 @@ export default async function VenueDashboard() {
                   </dl>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="panel-soft">
                 <CardHeader><CardTitle>Reviews given</CardTitle></CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2">
@@ -117,7 +123,7 @@ export default async function VenueDashboard() {
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="panel-soft">
                 <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <Button className="w-full justify-start" asChild><Link href="/venue/jobs"><Briefcase className="mr-2 h-4 w-4" /> Post a job listing</Link></Button>
