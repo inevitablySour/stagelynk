@@ -20,11 +20,12 @@ export interface PublicJobListing {
   eventDate: string | null;
   budgetMin: number;
   budgetMax: number;
+  hideBudget?: boolean;
   currency: string;
   genres: string[];
   applicantCount: number;
   isPromoted: boolean;
-  slots?: { id: string; label: string; filled: boolean; reserved?: boolean; budgetMin?: number | null; budgetMax?: number | null }[];
+  slots?: { id: string; label: string; filled: boolean; reserved?: boolean; budgetMin?: number | null; budgetMax?: number | null; startTime?: string | null; endTime?: string | null }[];
   description?: string;
   externalVenueName?: string;
   venueAddress?: string;
@@ -105,7 +106,7 @@ export function JobListings({ jobs, ctaLabel, ctaHref, onApply, hideSearch = fal
                   )}
                 </div>
                 <div className="flex shrink-0 flex-col gap-3 border-t border-line pt-4 sm:items-end sm:border-0 sm:pt-0">
-                  <div className="sm:text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Project budget</p><p className="mt-1 text-base font-semibold text-brand">{job.budgetMin > 0 || job.budgetMax > 0 ? `${formatMoney(job.budgetMin, job.currency)} – ${formatMoney(job.budgetMax, job.currency)}` : "Discuss with client"}</p></div>
+                  <div className="sm:text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Project budget</p><p className="mt-1 text-base font-semibold text-brand">{job.hideBudget ? "Discuss with client" : job.budgetMin > 0 || job.budgetMax > 0 ? `${formatMoney(job.budgetMin, job.currency)} – ${formatMoney(job.budgetMax, job.currency)}` : "Discuss with client"}</p></div>
                   {onApply ? (
                     <Button size="sm" disabled={Boolean(job.slots?.length) && !job.slots?.some((slot) => !slot.filled && !slot.reserved)} onClick={() => onApply(job.id, job)}>{ctaLabel}<ArrowUpRight className="ml-2 h-4 w-4" /></Button>
                   ) : (
@@ -121,7 +122,7 @@ export function JobListings({ jobs, ctaLabel, ctaHref, onApply, hideSearch = fal
                   {job.applicationDeadline && <p className="text-xs text-muted">Apply before {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: job.timeZone ?? "UTC" }).format(new Date(job.applicationDeadline))} ({job.timeZone ?? "UTC"})</p>}
                   <div><h4 className="mb-2 font-semibold">Stage & technical setup</h4><p className="whitespace-pre-line leading-6 text-muted">{job.stageSpecs || "Confirm stage specifications with the client."}</p><p className="mt-2 text-xs text-muted">{job.useVenueEquipment ? "Technical matching uses the venue's current in-house equipment." : "Technical matching uses this event's equipment list."}</p>{job.equipmentProvided && job.equipmentProvided.length > 0 && <p className="mt-2 text-xs text-muted">{job.equipmentProvided.join(" · ")}</p>}</div>
                   {job.requiredServices && job.requiredServices.length > 0 && <p className="text-muted">Required services: {job.requiredServices.join(", ")}</p>}
-                  {job.slots && <ul className="space-y-2">{job.slots.map((slot) => <li key={slot.id} className="flex flex-wrap justify-between gap-2 rounded-xl border border-line p-3"><span>{slot.label} · {slot.filled ? "Booked" : slot.reserved ? "Payment pending" : "Open"}</span><span className="font-medium text-brand">{formatMoney(slot.budgetMin ?? job.budgetMin, job.currency)}–{formatMoney(slot.budgetMax ?? job.budgetMax, job.currency)}</span></li>)}</ul>}
+                  {job.slots && <ul className="space-y-2">{job.slots.map((slot) => <li key={slot.id} className="flex flex-wrap justify-between gap-2 rounded-xl border border-line p-3"><span>{slot.label}{slot.startTime && slot.endTime ? ` · ${slot.startTime}–${slot.endTime}` : ""} · {slot.filled ? "Booked" : slot.reserved ? "Payment pending" : "Open"}</span><span className="font-medium text-brand">{job.hideBudget ? "Discuss with client" : `${formatMoney(slot.budgetMin ?? job.budgetMin, job.currency)}–${formatMoney(slot.budgetMax ?? job.budgetMax, job.currency)}`}</span></li>)}</ul>}
                   {job.fit && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{([["Overall", job.fit.overall], ["Genre", job.fit.genreFit], ["Technical", job.fit.technicalFit], ["Financial", job.fit.financialFit]] as const).map(([label, score]) => <p key={label} className="rounded-lg bg-brand-soft/60 p-3 text-xs">{label} fit <strong className="mt-1 block text-base text-brand">{Math.round(score * 100)}%</strong></p>)}</div>}
                   {job.technicalGaps && <TechnicalGapAlert gaps={job.technicalGaps} />}
                 </div>

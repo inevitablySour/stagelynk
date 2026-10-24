@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { scoreApplication } from "@/lib/application-fit";
-import { dailyRotationSeed } from "@/lib/blind-scout";
+import { scoreApplication, rankApplicationsTiered } from "@/lib/application-fit";
 import { getListingTechnicalGaps } from "@/lib/technical-gap";
 import { effectiveBudget } from "@/lib/open-call-utils";
 
@@ -77,13 +76,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     })
   );
 
-  // Rotation-based tie-break (not createdAt) so applicants with identical
-  // fit scores aren't always ordered by who applied most recently — part of
-  // the spec's "open rotation model" for equitable visibility.
-  scored.sort((a, b) => {
-    if (a.fit.overall !== b.fit.overall) return b.fit.overall - a.fit.overall;
-    return dailyRotationSeed(a.id) - dailyRotationSeed(b.id);
-  });
+  // Tiered sort (equipment -> genre -> financial fit), not the flat weighted
+  // sum fit.overall — equipment fit now takes priority the way "tiered
+  // matching" was asked for, with a rotation-based tie-break so applicants
+  // with identical fit aren't always ordered by who applied most recently.
+  const ranked = rankApplicationsTiered(scored);
 
-  return NextResponse.json({ success: true, data: scored });
+  return NextResponse.json({ success: true, data: ranked });
 }

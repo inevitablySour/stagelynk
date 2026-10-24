@@ -2,13 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Calendar, Users, DollarSign, MapPin, Eye, Sparkles, Star, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Calendar, Users, DollarSign, MapPin, Eye, Sparkles, Star, Clock, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/lib/marketplace-fees";
 import type { JobListingStatus, JobApplicationStatus } from "@/types";
+
+interface SlotRow {
+  label: string;
+  startTime: string;
+  endTime: string;
+  budgetMin: string;
+  budgetMax: string;
+}
+
+const emptySlotRow = (): SlotRow => ({ label: "", startTime: "", endTime: "", budgetMin: "", budgetMax: "" });
 
 interface JobListingRow {
   id: string;
@@ -17,6 +27,7 @@ interface JobListingRow {
   location: string;
   budgetMin: number;
   budgetMax: number;
+  hideBudget: boolean;
   currency: string;
   status: JobListingStatus;
   isPromoted: boolean;
@@ -71,7 +82,8 @@ export function VenueJobsManager({ listings }: { listings: JobListingRow[] }) {
   const [location, setLocation] = useState("");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
-  const [slotLabelsInput, setSlotLabelsInput] = useState("");
+  const [hideBudget, setHideBudget] = useState(false);
+  const [slotRows, setSlotRows] = useState<SlotRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -90,6 +102,20 @@ export function VenueJobsManager({ listings }: { listings: JobListingRow[] }) {
       setError("Title (4+ chars), event type, and a description (20+ chars) are required.");
       return;
     }
+    const labeledRows = slotRows.filter((row) => row.label.trim());
+    const slots = labeledRows.length
+      ? labeledRows.map((row) => ({
+          label: row.label.trim(),
+          startTime: row.startTime || undefined,
+          endTime: row.endTime || undefined,
+          budgetMin: row.budgetMin ? Number(row.budgetMin) : undefined,
+          budgetMax: row.budgetMax ? Number(row.budgetMax) : undefined,
+        }))
+      : undefined;
+    if (slots?.some((s) => (s.startTime == null) !== (s.endTime == null))) {
+      setError("Each slot needs both a start and end time, or neither.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/venues/jobs", {
@@ -102,9 +128,8 @@ export function VenueJobsManager({ listings }: { listings: JobListingRow[] }) {
           location: location.trim() || undefined,
           budgetMin: budgetMin ? Number(budgetMin) : undefined,
           budgetMax: budgetMax ? Number(budgetMax) : undefined,
-          slotLabels: slotLabelsInput.trim()
-            ? slotLabelsInput.split(",").map((s) => s.trim()).filter(Boolean)
-            : undefined,
+          hideBudget,
+          slots,
           status: "draft",
         }),
       });
@@ -119,7 +144,8 @@ export function VenueJobsManager({ listings }: { listings: JobListingRow[] }) {
       setLocation("");
       setBudgetMin("");
       setBudgetMax("");
-      setSlotLabelsInput("");
+      setHideBudget(false);
+      setSlotRows([]);
       setShowForm(false);
       router.refresh();
     } catch {
@@ -204,15 +230,59 @@ export function VenueJobsManager({ listings }: { listings: JobListingRow[] }) {
               <Input type="number" placeholder="Budget min" value={budgetMin} onChange={(e) => setBudgetMin(e.target.value)} />
               <Input type="number" placeholder="Budget max" value={budgetMax} onChange={(e) => setBudgetMax(e.target.value)} />
             </div>
-            <div>
-              <Input
-                placeholder="Lineup slots, comma separated (e.g. Opener, Support, Co-headliner)"
-                value={slotLabelsInput}
-                onChange={(e) => setSlotLabelsInput(e.target.value)}
+            <label className="flex items-center gap-2 text-sm text-stone-600">
+              <input
+                type="checkbox"
+                checked={hideBudget}
+                onChange={(e) => setHideBudget(e.target.checked)}
+                className="h-4 w-4 rounded border-stone-300 text-olive-600 focus:ring-olive-500"
               />
-              <p className="mt-1 text-xs text-stone-400">
-                Leave blank for a single-slot booking. Applicants pick which slot they&apos;re applying for.
+              Hide this budget range from artists — show &quot;Discuss with client&quot; instead
+            </label>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-stone-700">Lineup slots (optional)</p>
+              <p className="text-xs text-stone-400">
+                Leave empty for a single-slot booking. Add a row per performance slot — label required, times and a budget override are optional.
               </p>
+              {slotRows.map((row, i) => (
+                <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-stone-200 p-3 sm:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_auto]">
+                  <Input
+                    placeholder="Slot label (e.g. Opener)"
+                    value={row.label}
+                    onChange={(e) => setSlotRows((rows) => rows.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)))}
+                  />
+                  <Input
+                    type="time"
+                    placeholder="Start"
+                    value={row.startTime}
+                    onChange={(e) => setSlotRows((rows) => rows.map((r, j) => (j === i ? { ...r, startTime: e.target.value } : r)))}
+                  />
+                  <Input
+                    type="time"
+                    placeholder="End"
+                    value={row.endTime}
+                    onChange={(e) => setSlotRows((rows) => rows.map((r, j) => (j === i ? { ...r, endTime: e.target.value } : r)))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Fee min"
+                    value={row.budgetMin}
+                    onChange={(e) => setSlotRows((rows) => rows.map((r, j) => (j === i ? { ...r, budgetMin: e.target.value } : r)))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Fee max"
+                    value={row.budgetMax}
+                    onChange={(e) => setSlotRows((rows) => rows.map((r, j) => (j === i ? { ...r, budgetMax: e.target.value } : r)))}
+                  />
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setSlotRows((rows) => rows.filter((_, j) => j !== i))}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" size="sm" variant="outline" onClick={() => setSlotRows((rows) => [...rows, emptySlotRow()])}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> Add slot
+              </Button>
             </div>
             <textarea
               className="min-h-24 w-full rounded-lg border border-stone-300 bg-sand-50 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-olive-500"

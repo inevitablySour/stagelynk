@@ -10,7 +10,18 @@ export const openCallInclude = {
   slots: { orderBy: { order: "asc" as const } },
 } satisfies Prisma.JobListingInclude;
 
-export function serializeCall(listing: Prisma.JobListingGetPayload<{ include: typeof openCallInclude }>) {
+/**
+ * `forPublicDisplay: true` suppresses real budget numbers at the
+ * serialization boundary when the venue chose to hide them (hideBudget) —
+ * the client never receives the real figures at all, not just a UI-level
+ * mask. Internal callers (matching/scoring, the venue's own management view)
+ * pass false/omit so fit calculations still see real numbers.
+ */
+export function serializeCall(
+  listing: Prisma.JobListingGetPayload<{ include: typeof openCallInclude }>,
+  options: { forPublicDisplay?: boolean } = {}
+) {
+  const suppress = options.forPublicDisplay && listing.hideBudget;
   return {
     id: listing.id, title: listing.title, description: listing.description,
     venueName: listing.venue.venueName, externalVenueName: listing.externalVenueName,
@@ -18,7 +29,8 @@ export function serializeCall(listing: Prisma.JobListingGetPayload<{ include: ty
     eventDate: listing.eventDate?.toISOString().slice(0, 10) ?? null,
     startTime: listing.startTime, endTime: listing.endTime, timeZone: listing.timeZone,
     applicationDeadline: listing.applicationDeadline?.toISOString() ?? null,
-    budgetMin: listing.budgetMin, budgetMax: listing.budgetMax, currency: listing.currency,
+    budgetMin: suppress ? 0 : listing.budgetMin, budgetMax: suppress ? 0 : listing.budgetMax,
+    hideBudget: listing.hideBudget, currency: listing.currency,
     genres: Array.isArray(listing.genres) ? listing.genres as string[] : [],
     stageSpecs: listing.stageSpecs, useVenueEquipment: listing.useVenueEquipment,
     eventEquipment: Array.isArray(listing.eventEquipment) ? listing.eventEquipment as { equipmentId: string; quantity: number }[] : [],
@@ -27,7 +39,8 @@ export function serializeCall(listing: Prisma.JobListingGetPayload<{ include: ty
     applicantCount: listing._count.applications, isPromoted: listing.isPromoted, status: listing.status,
     slots: listing.slots.map((slot) => ({
       id: slot.id, label: slot.label, filled: slot.filled, reserved: Boolean(slot.reservedByApplicationId) && !slot.filled,
-      budgetMin: slot.budgetMin, budgetMax: slot.budgetMax,
+      budgetMin: suppress ? null : slot.budgetMin, budgetMax: suppress ? null : slot.budgetMax,
+      startTime: slot.startTime, endTime: slot.endTime,
     })),
   };
 }
@@ -46,20 +59,31 @@ export async function listOpenCalls(filters: { q?: string; genre?: string; subge
     where: { id: musicianId, user: { deletedAt: null } }, include: { genres: { include: { genre: true } } },
   }) : null;
   const calls = await Promise.all(listings.filter((listing) => isCallOpen(listing) && listing.eventStartsAt && listing.eventEndsAt).map(async (listing) => {
-    const call = serializeCall(listing);
+    // Fit scoring and budget filtering always use the real numbers, even when
+    // hideBudget is set — suppression is a display-layer concern only
+    // (applied via forPublicDisplay below), so matching/filtering never
+    // silently breaks for a listing whose budget is hidden from view.
+    const call = serializeCall(listing, { forPublicDisplay: true });
     const gaps = artist ? await getListingTechnicalGaps(artist.id, listing) : undefined;
     const fit = artist ? await scoreApplication({
       musicianId: artist.id, venueId: listing.venueId, listingGenreSlugs: call.genres,
       artistGenreSlugs: [...artist.genres.map((genre) => genre.genre.slug), ...artist.subgenres],
-      proposedFee: artist.performanceFee, budgetMin: call.budgetMin, budgetMax: call.budgetMax, technicalGaps: gaps,
+      proposedFee: artist.performanceFee, budgetMin: listing.budgetMin, budgetMax: listing.budgetMax, technicalGaps: gaps,
     }) : undefined;
-    return { ...call, technicalGaps: gaps, fit };
+    return {
+      call: { ...call, technicalGaps: gaps, fit },
+      realBudgetMin: listing.budgetMin,
+      realBudgetMax: listing.budgetMax,
+      realSlots: listing.slots,
+    };
   }));
-  return calls.filter((call) =>
-    call.slots.some((slot) => !slot.filled && !slot.reserved
-      && (filters.minBudget === undefined || (slot.budgetMax ?? call.budgetMax) >= filters.minBudget)
-      && (filters.maxBudget === undefined || (slot.budgetMin ?? call.budgetMin) <= filters.maxBudget))
-    && (!filters.genre || call.genres.includes(filters.genre))
-    && (!filters.subgenre || call.genres.some((tag) => tag.toLocaleLowerCase().replaceAll("-", " ").includes(filters.subgenre!.toLocaleLowerCase().replaceAll("-", " "))))
-    && (!filters.technicalFit || call.technicalGaps?.length === 0));
+  return calls
+    .filter(({ call, realBudgetMin, realBudgetMax, realSlots }) =>
+      call.slots.some((slot, index) => !slot.filled && !slot.reserved
+        && (filters.minBudget === undefined || (realSlots[index]?.budgetMax ?? realBudgetMax) >= filters.minBudget)
+        && (filters.maxBudget === undefined || (realSlots[index]?.budgetMin ?? realBudgetMin) <= filters.maxBudget))
+      && (!filters.genre || call.genres.includes(filters.genre))
+      && (!filters.subgenre || call.genres.some((tag) => tag.toLocaleLowerCase().replaceAll("-", " ").includes(filters.subgenre!.toLocaleLowerCase().replaceAll("-", " "))))
+      && (!filters.technicalFit || call.technicalGaps?.length === 0))
+    .map(({ call }) => call);
 }
