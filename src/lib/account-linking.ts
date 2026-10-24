@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
-export const LINK_STATE_COOKIE = "stagelynk.link_state";
+export const LINK_STATE_COOKIE = "indiecentral.link_state";
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;

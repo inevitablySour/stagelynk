@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { BookingPaymentStep } from "@/components/artists/booking-payment-step";
 import { calculateMarketplaceFees, formatMoney } from "@/lib/marketplace-fees";
+import { APP_NAME } from "@/config";
 
 interface BookingRequestFormProps {
   musicianId: string;
@@ -159,7 +160,7 @@ export function BookingRequestForm({ musicianId, stageName }: BookingRequestForm
                 <dd className="font-medium text-stone-900">{formatMoney(breakdown.performanceFee, breakdown.currency)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-stone-500">StageLynk platform fee ({(breakdown.platformFeeRate * 100).toFixed(0)}%)</dt>
+                <dt className="text-stone-500">{APP_NAME} platform fee ({(breakdown.platformFeeRate * 100).toFixed(0)}%)</dt>
                 <dd className="text-stone-700">{formatMoney(breakdown.platformFeeAmount, breakdown.currency)}</dd>
               </div>
               <div className="flex justify-between">

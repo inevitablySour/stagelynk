@@ -7,7 +7,7 @@ import { Link2, CheckCircle2 } from "lucide-react";
 
 const LINK_ERROR_MESSAGES: Record<string, string> = {
   denied: "You cancelled the connection request.",
-  already_linked_elsewhere: "That account is already connected to a different StageLynk account.",
+  already_linked_elsewhere: "That account is already connected to a different IndieCentral account.",
   state_mismatch: "That link request expired or was invalid. Please try again.",
   state_invalid: "That link request expired or was invalid. Please try again.",
   not_configured: "That sign-in provider isn't configured yet.",

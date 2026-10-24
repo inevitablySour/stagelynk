@@ -13,6 +13,7 @@ import { AuthLayout } from "@/components/auth/auth-layout";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { RolePicker } from "@/components/auth/role-picker";
 import { TermsCheckbox } from "@/components/auth/terms-checkbox";
+import { APP_NAME } from "@/config";
 import { PasswordStrength } from "@/components/auth/password-strength";
 import type { UserRole } from "@/types";
 
@@ -92,7 +93,7 @@ export default function RegisterPage() {
     <AuthLayout>
       <Card>
         <CardHeader className="text-center">
-          <CardTitle>{step === 1 ? "Join StageLynk" : "Create your account"}</CardTitle>
+          <CardTitle>{step === 1 ? `Join ${APP_NAME}` : "Create your account"}</CardTitle>
           <CardDescription>
             {step === 1 ? "How will you use the platform?" : `Sign up as a ${role === "musician" ? "creative" : "client"}`}
           </CardDescription>
@@ -126,7 +127,7 @@ export default function RegisterPage() {
                   <span className="w-full border-t border-stone-200" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-surface px-2 text-muted">or choose how you&apos;ll use StageLynk</span>
+                  <span className="bg-surface px-2 text-muted">or choose how you&apos;ll use {APP_NAME}</span>
                 </div>
               </div>
 

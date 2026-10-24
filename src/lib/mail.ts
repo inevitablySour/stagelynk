@@ -17,11 +17,11 @@ function getClient() {
   return mailjet;
 }
 
-/** Sender addresses by purpose. All addresses under the verified stagelynk.co domain send without separate per-mailbox verification. */
+/** Sender addresses by purpose. All addresses under the verified indiecentral.eu domain send without separate per-mailbox verification. */
 export const MAIL_FROM = {
-  noreply: process.env.MAIL_FROM_NOREPLY ?? "noreply@stagelynk.co",
-  accounts: process.env.MAIL_FROM_ACCOUNTS ?? "accounts@stagelynk.co",
-  support: process.env.MAIL_FROM_SUPPORT ?? "support@stagelynk.co",
+  noreply: process.env.MAIL_FROM_NOREPLY ?? "noreply@indiecentral.eu",
+  accounts: process.env.MAIL_FROM_ACCOUNTS ?? "accounts@indiecentral.eu",
+  support: process.env.MAIL_FROM_SUPPORT ?? "support@indiecentral.eu",
 } as const;
 
 export interface SendEmailInput {

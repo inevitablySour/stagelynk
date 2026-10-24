@@ -54,7 +54,7 @@ export function BookingRequestCard({ musicianId, stageName, viewer }: BookingReq
           <p className="flex items-start gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-brand" />The artist has 48 hours to respond.</p>
           <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" />A 5% platform fee is added to the agreed artist fee. Review the full breakdown before submitting.</p>
         </div>}
-        {state === "guest" && <p className="text-xs leading-5 text-muted">New to StageLynk? <Link href="/register" className="font-semibold text-brand underline underline-offset-4">Create a client account</Link>.</p>}
+        {state === "guest" && <p className="text-xs leading-5 text-muted">New to IndieCentral? <Link href="/register" className="font-semibold text-brand underline underline-offset-4">Create a client account</Link>.</p>}
       </CardContent>
     </Card>
   );

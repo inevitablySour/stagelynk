@@ -3,7 +3,7 @@ import { DollarSign, Megaphone, CheckCircle2, ArrowRight } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DASHBOARD_NAV_VENUE } from "@/config";
+import { APP_NAME, DASHBOARD_NAV_VENUE } from "@/config";
 import { formatMoney, calculateMarketplaceFees } from "@/lib/marketplace-fees";
 
 const exampleFees = [300, 500, 1000].map((fee) => ({ fee, ...calculateMarketplaceFees(fee) }));
@@ -15,7 +15,7 @@ export default function VenueBillingPage() {
       <main className="flex-1 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <h1 className="text-2xl font-bold text-stone-900">Billing & Fees</h1>
-          <p className="mt-1 text-stone-500">Understand how StageLynk pricing works for your bookings.</p>
+          <p className="mt-1 text-stone-500">Understand how {APP_NAME} pricing works for your bookings.</p>
 
           {/* How it works */}
           <Card className="mt-6 border-olive-200">

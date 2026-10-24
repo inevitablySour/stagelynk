@@ -6,6 +6,7 @@ import { BookingRequestCard, bookingCardState } from "../src/components/artists/
 import { PortfolioRelease } from "../src/components/artists/portfolio-release";
 import { createEmailMessage, isDeliverableRecipient, MAIL_FROM } from "../src/lib/mail";
 import { hashResetToken, resetTokenExpiry, passwordResetRequestSchema, passwordResetSchema } from "../src/lib/password-recovery";
+import { APP_NAME } from "../src/config";
 import type { Album } from "../src/types";
 
 test("booking card distinguishes guests, creatives, clients, admins and owners", () => {
@@ -41,11 +42,11 @@ test("Spotify release has a single player and no duplicate cover/title panel", (
 
 test("transactional senders and support replies use the configured purpose-specific addresses", () => {
   const message = createEmailMessage({
-    from: { email: MAIL_FROM.accounts, name: "StageLynk" },
+    from: { email: MAIL_FROM.accounts, name: APP_NAME },
     to: [{ email: "recipient@real-mail-domain.com" }], subject: "Account update", text: "Your account update.",
   });
   assert.equal(message?.From.Email, MAIL_FROM.accounts);
-  assert.equal(message?.From.Name, "StageLynk Accounts");
+  assert.equal(message?.From.Name, `${APP_NAME} Accounts`);
   assert.equal(message?.ReplyTo?.Email, MAIL_FROM.support);
   for (const email of ["demo@example.test", "demo@demo.stagelynk.invalid", "demo@example.com", "demo@localhost"]) assert.equal(isDeliverableRecipient(email), false);
 });
