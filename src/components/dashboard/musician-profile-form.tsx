@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { GENRES, SERVICES } from "@/config";
+import { HierarchicalPicker } from "@/components/common/hierarchical-picker";
+import { GENRE_GROUPS, SERVICES } from "@/config";
+
+const GENRE_PICKER_GROUPS = GENRE_GROUPS.map((g) => ({
+  id: g.slug, name: g.name, children: g.subgenres.map((s) => ({ id: s.slug, name: s.name })),
+}));
+const OTHER_SLUGS = new Set(GENRE_GROUPS.flatMap((g) => g.subgenres.filter((s) => s.isOther).map((s) => s.slug)));
 
 interface MusicianProfileFormProps {
   initial: {
@@ -15,7 +20,9 @@ interface MusicianProfileFormProps {
     bio: string;
     location: string;
     experienceYears: number;
-    genreSlugs: string[];
+    mainGenreGroupSlug: string | null;
+    genreSubtypeSlugs: string[];
+    genreCustomLabel: string | null;
     serviceSlugs: string[];
     instruments: string[];
   };
@@ -27,32 +34,29 @@ export function MusicianProfileForm({ initial }: MusicianProfileFormProps) {
   const [location, setLocation] = useState(initial.location);
   const [bio, setBio] = useState(initial.bio);
   const [experienceYears, setExperienceYears] = useState(initial.experienceYears);
-  const [genreSlugs, setGenreSlugs] = useState<string[]>(initial.genreSlugs);
+  const [mainGenreGroup, setMainGenreGroup] = useState<string | null>(initial.mainGenreGroupSlug);
+  const [genreSubtypes, setGenreSubtypes] = useState<string[]>(initial.genreSubtypeSlugs);
+  const [customLabel, setCustomLabel] = useState(initial.genreCustomLabel ?? "");
   const [serviceSlugs, setServiceSlugs] = useState<string[]>(initial.serviceSlugs);
-  const [instruments, setInstruments] = useState<string[]>(initial.instruments);
-  const [instrumentInput, setInstrumentInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const toggleGenre = (slug: string) => {
-    setGenreSlugs((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
+  const selectedOtherSlug = genreSubtypes.find((slug) => OTHER_SLUGS.has(slug));
+
+  const toggleGenreGroup = (groupId: string) => {
+    // single-select-group: picking a new main genre clears prior subgenre picks
+    setMainGenreGroup((prev) => (prev === groupId ? null : groupId));
+    setGenreSubtypes([]);
+    setCustomLabel("");
+  };
+
+  const toggleGenreSubtype = (slug: string) => {
+    setGenreSubtypes((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
   };
 
   const toggleService = (slug: string) => {
     setServiceSlugs((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
   };
-
-  function addInstrument() {
-    const value = instrumentInput.trim();
-    if (value && !instruments.includes(value) && instruments.length < 20) {
-      setInstruments((prev) => [...prev, value]);
-    }
-    setInstrumentInput("");
-  }
-
-  function removeInstrument(value: string) {
-    setInstruments((prev) => prev.filter((i) => i !== value));
-  }
 
   const handleSave = async () => {
     setSaving(true);
@@ -66,9 +70,16 @@ export function MusicianProfileForm({ initial }: MusicianProfileFormProps) {
           location,
           bio,
           experienceYears: Number(experienceYears) || 0,
-          genres: genreSlugs,
           services: serviceSlugs,
-          instruments,
+          ...(mainGenreGroup
+            ? {
+                mainGenreGroupSlug: mainGenreGroup,
+                genrePicks: genreSubtypes.map((subtypeSlug) => ({
+                  subtypeSlug,
+                  ...(OTHER_SLUGS.has(subtypeSlug) ? { customLabel: customLabel.trim() } : {}),
+                })),
+              }
+            : {}),
         }),
       });
       const json = await res.json();
@@ -122,14 +133,27 @@ export function MusicianProfileForm({ initial }: MusicianProfileFormProps) {
           />
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium">Genres</label>
-          <div className="flex flex-wrap gap-2">
-            {GENRES.map((genre) => (
-              <button key={genre.slug} type="button" onClick={() => toggleGenre(genre.slug)}>
-                <Badge variant={genreSlugs.includes(genre.slug) ? "default" : "outline"}>{genre.name}</Badge>
-              </button>
-            ))}
-          </div>
+          <label className="mb-2 block text-sm font-medium">Genre</label>
+          <p className="mb-2 text-xs text-stone-500">Pick one main genre, then 1-3 subgenres within it.</p>
+          <HierarchicalPicker
+            groups={GENRE_PICKER_GROUPS}
+            selectedGroupIds={mainGenreGroup ? [mainGenreGroup] : []}
+            selectedChildIds={genreSubtypes}
+            onGroupToggle={toggleGenreGroup}
+            onChildToggle={toggleGenreSubtype}
+            maxChildrenPerGroup={3}
+            mode="single-select-group"
+            groupLabel="Main genre"
+            childLabel="Subgenre"
+          />
+          {selectedOtherSlug && (
+            <Input
+              className="mt-2 max-w-sm"
+              placeholder="Describe your custom genre tag"
+              value={customLabel}
+              onChange={(e) => setCustomLabel(e.target.value)}
+            />
+          )}
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium">Services you offer</label>
@@ -142,37 +166,17 @@ export function MusicianProfileForm({ initial }: MusicianProfileFormProps) {
             ))}
           </div>
         </div>
-        <div>
-          <label className="mb-2 block text-sm font-medium">Instruments</label>
-          <div className="flex gap-2">
-            <Input
-              placeholder="e.g. Guitar, Vocals, Drums"
-              value={instrumentInput}
-              onChange={(e) => setInstrumentInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addInstrument();
-                }
-              }}
-            />
-            <Button type="button" variant="outline" onClick={addInstrument}>
-              Add
-            </Button>
-          </div>
-          {instruments.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {instruments.map((instrument) => (
-                <Badge key={instrument} variant="secondary" className="flex items-center gap-1">
-                  {instrument}
-                  <button type="button" onClick={() => removeInstrument(instrument)}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
+        {initial.instruments.length > 0 && (
+          <div>
+            <label className="mb-2 block text-sm font-medium">Instruments</label>
+            <p className="mb-2 text-xs text-stone-500">Set from your category &amp; role picks below.</p>
+            <div className="flex flex-wrap gap-2">
+              {initial.instruments.map((instrument) => (
+                <Badge key={instrument} variant="secondary">{instrument}</Badge>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <Button type="button" onClick={handleSave} disabled={saving}>
             {saving ? "Saving..." : "Save profile"}

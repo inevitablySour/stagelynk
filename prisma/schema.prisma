@@ -281,7 +281,6 @@ model MusicianProfile {
   reviewCount     Int     @default(0)
   socialLinks     Json    @default("{}")
   instruments     String[] @default([])
-  subgenres       String[] @default([])
   influences      String[] @default([])
   favorites       String[] @default([])
   performanceFee  Float?
@@ -299,12 +298,13 @@ model MusicianProfile {
   stripePayoutsEnabled    Boolean  @default(false)
   stripeCustomerId        String?  @unique
 
-  primaryCategory String  @default("musician")
+  mainGenreGroupId String?
 
-  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  genres     MusicianGenre[]
-  categories TalentCategory[]
-  services   MusicianService[]
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mainGenreGroup GenreGroup?      @relation(fields: [mainGenreGroupId], references: [id])
+  genrePicks    MusicianGenreSubtypePick[]
+  categoryPicks MusicianCategoryPick[]
+  services      MusicianService[]
   albums     Album[]
   bookings   Booking[]
   reviews    Review[]
@@ -327,19 +327,7 @@ model MusicianProfile {
   @@index([stageName])
   @@index([location])
   @@index([rating])
-  @@index([primaryCategory])
-}
-
-model MusicianGenre {
-  id         String @id @default(cuid())
-  musicianId String
-  genreId    String
-
-  musician MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
-  genre    Genre           @relation(fields: [genreId], references: [id], onDelete: Cascade)
-
-  @@unique([musicianId, genreId])
-  @@index([genreId])
+  @@index([mainGenreGroupId])
 }
 
 model Album {
@@ -808,41 +796,110 @@ model AnalyticsEvent {
   @@index([occurredAt])
 }
 
-model Genre {
+// ── Creative category hierarchy ──────────────────────────────
+// 3 broad groups (Music & Audio Production, Film & Audiovisual
+// Crew, Visual Artists & Creative Design) -> ~30 subcategories,
+// one of which (Instrumentalist & Session Musician) has a further
+// nested instrument-type level. A musician may pick up to 3
+// subcategories PER broad group (enforced in Zod, not here).
+model CategoryGroup {
   id   String @id @default(cuid())
   name String @unique
   slug String @unique
 
-  musicians MusicianGenre[]
-}
-
-model CreativeCategory {
-  id   String @id @default(cuid())
-  name String @unique
-  slug String @unique
-  icon String @default("")
-
-  talents TalentCategory[]
+  subcategories CategorySubtype[]
 
   @@index([slug])
 }
 
-model TalentCategory {
-  id         String @id @default(cuid())
-  musicianId String
-  categoryId String
+model CategorySubtype {
+  id      String @id @default(cuid())
+  groupId String
+  name    String
+  slug    String @unique
 
-  musician MusicianProfile  @relation(fields: [musicianId], references: [id], onDelete: Cascade)
-  category CreativeCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  group           CategoryGroup           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  instrumentTypes InstrumentType[]
+  picks           MusicianCategoryPick[]
 
-  @@unique([musicianId, categoryId])
-  @@index([categoryId])
+  @@index([groupId])
+}
+
+model InstrumentType {
+  id        String @id @default(cuid())
+  subtypeId String
+  name      String
+  slug      String @unique
+
+  subtype CategorySubtype        @relation(fields: [subtypeId], references: [id], onDelete: Cascade)
+  picks   MusicianCategoryPick[]
+
+  @@index([subtypeId])
+}
+
+model MusicianCategoryPick {
+  id               String  @id @default(cuid())
+  musicianId       String
+  subtypeId        String
+  instrumentTypeId String?
+
+  musician       MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  subtype        CategorySubtype @relation(fields: [subtypeId], references: [id], onDelete: Cascade)
+  instrumentType InstrumentType? @relation(fields: [instrumentTypeId], references: [id])
+
+  @@unique([musicianId, subtypeId, instrumentTypeId])
+  @@index([subtypeId])
+}
+
+// ── Genre hierarchy ───────────────────────────────────────────
+// 9 broad groups (Rock, Electronic & Dance, Metal, Hip-Hop & Rap,
+// Acoustic & Folk, Jazz, Fusion & Experimental, Soundtrack, Pop)
+// each with specific subgenres + one "Other" free-text row. A
+// musician picks exactly ONE main broad group (MusicianProfile.
+// mainGenreGroupId), then 1-3 subgenres from within that group
+// only (enforced in Zod, not here).
+model GenreGroup {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  subgenres GenreSubtype[]
+  musicians MusicianProfile[]
+
+  @@index([slug])
+}
+
+model GenreSubtype {
+  id      String  @id @default(cuid())
+  groupId String
+  name    String
+  slug    String  @unique
+  isOther Boolean @default(false)
+
+  group GenreGroup                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  picks MusicianGenreSubtypePick[]
+
+  @@index([groupId])
+}
+
+model MusicianGenreSubtypePick {
+  id          String  @id @default(cuid())
+  musicianId  String
+  subtypeId   String
+  customLabel String?
+
+  musician MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  subtype  GenreSubtype    @relation(fields: [subtypeId], references: [id], onDelete: Cascade)
+
+  @@unique([musicianId, subtypeId])
+  @@index([subtypeId])
 }
 
 // Services a creative offers (session recording, mixing, filming, lessons,
-// etc.) — distinct from genre/style and from CreativeCategory ("what kind of
-// creative they are"). Applies to every profile type on MusicianProfile
-// (musicians, DJs, voice actors, videographers, sound engineers, and so on).
+// etc.) — distinct from genre/style and from CategoryGroup/CategorySubtype
+// ("what kind of creative they are"). Applies to every profile type on
+// MusicianProfile (musicians, DJs, voice actors, videographers, sound
+// engineers, and so on).
 model Service {
   id   String @id @default(cuid())
   name String @unique

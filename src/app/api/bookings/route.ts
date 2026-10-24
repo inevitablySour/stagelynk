@@ -37,7 +37,7 @@ export async function GET() {
 
     const bookings = await prisma.booking.findMany({
       where: { venueId: venue.id },
-      include: { musician: { select: { stageName: true, primaryCategory: true } } },
+      include: { musician: { select: { stageName: true } } },
       orderBy: { eventDate: "desc" },
     });
     return NextResponse.json({ success: true, data: bookings });

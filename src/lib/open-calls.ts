@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { isCallOpen } from "@/lib/open-call-utils";
 import { getListingTechnicalGaps } from "@/lib/technical-gap";
 import { scoreApplication } from "@/lib/application-fit";
+import { leewayForBudget } from "@/lib/rate-leeway";
 import type { Prisma } from "@prisma/client";
 
 export const openCallInclude = {
@@ -46,7 +47,7 @@ export function serializeCall(
 }
 export type OpenCallRow = ReturnType<typeof serializeCall>;
 
-export async function listOpenCalls(filters: { q?: string; genre?: string; subgenre?: string; minBudget?: number; maxBudget?: number; technicalFit?: boolean } = {}, musicianId?: string) {
+export async function listOpenCalls(filters: { q?: string; genre?: string; minBudget?: number; maxBudget?: number; technicalFit?: boolean } = {}, musicianId?: string) {
   const listings = await prisma.jobListing.findMany({
     where: {
       status: "published", venue: { user: { deletedAt: null } },
@@ -56,7 +57,7 @@ export async function listOpenCalls(filters: { q?: string; genre?: string; subge
     orderBy: [{ isPromoted: "desc" }, { createdAt: "desc" }],
   });
   const artist = musicianId ? await prisma.musicianProfile.findFirst({
-    where: { id: musicianId, user: { deletedAt: null } }, include: { genres: { include: { genre: true } } },
+    where: { id: musicianId, user: { deletedAt: null } }, include: { genrePicks: { include: { subtype: true } } },
   }) : null;
   const calls = await Promise.all(listings.filter((listing) => isCallOpen(listing) && listing.eventStartsAt && listing.eventEndsAt).map(async (listing) => {
     // Fit scoring and budget filtering always use the real numbers, even when
@@ -67,7 +68,7 @@ export async function listOpenCalls(filters: { q?: string; genre?: string; subge
     const gaps = artist ? await getListingTechnicalGaps(artist.id, listing) : undefined;
     const fit = artist ? await scoreApplication({
       musicianId: artist.id, venueId: listing.venueId, listingGenreSlugs: call.genres,
-      artistGenreSlugs: [...artist.genres.map((genre) => genre.genre.slug), ...artist.subgenres],
+      artistGenreSlugs: artist.genrePicks.map((p) => p.subtype.slug),
       proposedFee: artist.performanceFee, budgetMin: listing.budgetMin, budgetMax: listing.budgetMax, technicalGaps: gaps,
     }) : undefined;
     return {
@@ -79,11 +80,21 @@ export async function listOpenCalls(filters: { q?: string; genre?: string; subge
   }));
   return calls
     .filter(({ call, realBudgetMin, realBudgetMax, realSlots }) =>
-      call.slots.some((slot, index) => !slot.filled && !slot.reserved
-        && (filters.minBudget === undefined || (realSlots[index]?.budgetMax ?? realBudgetMax) >= filters.minBudget)
-        && (filters.maxBudget === undefined || (realSlots[index]?.budgetMin ?? realBudgetMin) <= filters.maxBudget))
+      call.slots.some((slot, index) => {
+        if (slot.filled || slot.reserved) return false;
+        const slotMax = realSlots[index]?.budgetMax ?? realBudgetMax;
+        const slotMin = realSlots[index]?.budgetMin ?? realBudgetMin;
+        // "Shop up" leeway: an artist's stated floor (minBudget) can be
+        // slightly undercut by a call paying a bit less, tiered by the
+        // call's own budget so the tolerance scales with price point.
+        if (filters.minBudget !== undefined) {
+          const { below } = leewayForBudget(slotMax);
+          if (slotMax < filters.minBudget * (1 - below)) return false;
+        }
+        if (filters.maxBudget !== undefined && slotMin > filters.maxBudget) return false;
+        return true;
+      })
       && (!filters.genre || call.genres.includes(filters.genre))
-      && (!filters.subgenre || call.genres.some((tag) => tag.toLocaleLowerCase().replaceAll("-", " ").includes(filters.subgenre!.toLocaleLowerCase().replaceAll("-", " "))))
       && (!filters.technicalFit || call.technicalGaps?.length === 0))
     .map(({ call }) => call);
 }

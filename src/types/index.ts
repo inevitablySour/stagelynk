@@ -11,12 +11,31 @@ export interface User {
 }
 
 // ── Musician / Artist ────────────────────────────────────────
+export interface MusicianGenrePick {
+  subtypeId: string;
+  subtypeName: string;
+  subtypeSlug: string;
+  customLabel?: string | null;
+}
+
+export interface MusicianCategoryPick {
+  subtypeId: string;
+  subtypeName: string;
+  subtypeSlug: string;
+  groupName: string;
+  groupSlug: string;
+  instrumentTypeName?: string | null;
+  instrumentTypeSlug?: string | null;
+}
+
 export interface MusicianProfile {
   id: string;
   userId: string;
   stageName: string;
   bio: string;
-  genres: Genre[];
+  mainGenreGroup: { id: string; name: string; slug: string } | null;
+  genrePicks: MusicianGenrePick[];
+  categoryPicks: MusicianCategoryPick[];
   services: Genre[];
   experienceYears: number;
   location: string;
@@ -25,7 +44,6 @@ export interface MusicianProfile {
   socialLinks: SocialLinks;
   availability: AvailabilitySlot[];
   instruments: string[];
-  subgenres?: string[];
   influences?: string[];
   favorites?: string[];
   performanceFee?: number | null;
@@ -36,7 +54,6 @@ export interface MusicianProfile {
   weightedRating: number;
   reviewCount: number;
   discography: Album[];
-  primaryCategory: string;
   createdAt: string;
 }
 
@@ -173,6 +190,7 @@ export interface JobListing {
   budgetMin: number;
   budgetMax: number;
   currency: string;
+  categories: string[];
   genres: string[];
   requiredServices: string[];
   equipmentProvided: string[];

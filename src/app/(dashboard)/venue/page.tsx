@@ -44,7 +44,7 @@ export default async function VenueDashboard() {
     }),
     prisma.booking.findMany({
       where: { venueId: venue.id },
-      include: { musician: { select: { stageName: true, primaryCategory: true } } },
+      include: { musician: { select: { stageName: true } } },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
@@ -93,7 +93,7 @@ export default async function VenueDashboard() {
                   <div className="space-y-3">
                     {recentBookings.map((b) => (
                       <div key={b.id} className="flex items-center justify-between rounded-lg border border-stone-100 p-3">
-                        <div><h4 className="font-medium text-stone-900">{b.musician.stageName}</h4><div className="flex items-center gap-2 mt-1 text-xs text-stone-500"><Calendar className="h-3 w-3" />{b.eventDate.toLocaleDateString()}<span>·</span><span>{b.musician.primaryCategory}</span></div></div>
+                        <div><h4 className="font-medium text-stone-900">{b.musician.stageName}</h4><div className="flex items-center gap-2 mt-1 text-xs text-stone-500"><Calendar className="h-3 w-3" />{b.eventDate.toLocaleDateString()}</div></div>
                         <div className="flex items-center gap-2"><span className="font-semibold text-stone-900">{formatMoney(b.fee, b.currency)}</span><Badge variant={BOOKING_BADGE_VARIANT[b.status]}>{b.status}</Badge></div>
                       </div>
                     ))}

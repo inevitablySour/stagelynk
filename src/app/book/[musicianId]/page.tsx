@@ -16,7 +16,7 @@ export default async function BookArtistPage({ params }: { params: Promise<{ mus
 
   const musician = await prisma.musicianProfile.findUnique({
     where: { id: musicianId, user: { deletedAt: null } },
-    select: { id: true, userId: true, stageName: true, location: true, profileImage: true, primaryCategory: true },
+    select: { id: true, userId: true, stageName: true, location: true, profileImage: true },
   });
   if (!musician) notFound();
   if (musician.userId === session.user.id) redirect(`/artists/${musician.id}`);

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { GENRES } from "@/config";
+import { GENRE_GROUPS } from "@/config";
 import type { P2PQuestionnaireQuestion } from "@/config";
 
 type Answer = string | string[] | null;
@@ -97,7 +97,7 @@ export function QuestionnaireForm({
 
         {question.type === "multi_choice" && (
           <div className="flex flex-wrap gap-2">
-            {GENRES.map((genre) => {
+            {GENRE_GROUPS.map((genre) => {
               const selected = Array.isArray(currentAnswer) && currentAnswer.includes(genre.slug);
               return (
                 <button key={genre.slug} type="button" onClick={() => toggleMultiOption(genre.slug)}>

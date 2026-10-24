@@ -8,7 +8,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const parsed = z.object({
     q: z.string().trim().max(120).optional(), genre: z.string().max(80).optional(),
-    subgenre: z.string().trim().max(80).optional(),
     minBudget: z.coerce.number().min(0).max(1000000).optional(),
     maxBudget: z.coerce.number().min(0).max(1000000).optional(),
     technicalFit: z.enum(["true", "false"]).optional(),

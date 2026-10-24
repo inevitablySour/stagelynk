@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/db";
 import { serializeMusicianProfile } from "@/lib/serializers";
 import { rankBlindScout } from "@/lib/blind-scout";
-import { discoveryQuerySchema, includesTag, normalizeCategory } from "@/lib/discovery-utils";
+import { discoveryQuerySchema, includesTag } from "@/lib/discovery-utils";
+import { withinLeeway } from "@/lib/rate-leeway";
 import type { z } from "zod/v4";
 
 export async function discoverArtists(filters: z.infer<typeof discoveryQuerySchema>) {
@@ -12,10 +13,11 @@ export async function discoverArtists(filters: z.infer<typeof discoveryQuerySche
       ...(filters.experienceMin !== undefined ? { experienceYears: { gte: filters.experienceMin } } : {}),
       ...(filters.hasCredentials === "true" ? { credentials: { some: {} } } : {}),
       ...(filters.credentialType ? { credentials: { some: { type: filters.credentialType } } } : {}),
-      ...(filters.maxFee !== undefined ? { performanceFee: { lte: filters.maxFee } } : {}),
     },
     include: {
-      genres: { include: { genre: true } },
+      mainGenreGroup: true,
+      genrePicks: { include: { subtype: true } },
+      categoryPicks: { include: { subtype: { include: { group: true } }, instrumentType: true } },
       services: { include: { service: true } },
       albums: { include: { tracks: true } },
       credentials: true,
@@ -29,14 +31,17 @@ export async function discoverArtists(filters: z.infer<typeof discoveryQuerySche
       },
     },
   });
-  const selectedCategories = filters.category.map((value) => normalizeCategory(value) ?? value);
+
   const results = profiles.filter((profile) => {
-    if (selectedCategories.length && !selectedCategories.includes(normalizeCategory(profile.primaryCategory) ?? profile.primaryCategory)) return false;
+    const categorySlugs = profile.categoryPicks.map((p) => p.subtype.slug);
+    if (filters.category.length && !filters.category.some((c) => categorySlugs.includes(c))) return false;
     if (filters.instrument && !includesTag(profile.instruments, filters.instrument)) return false;
-    if (filters.subgenre && !includesTag(profile.subgenres, filters.subgenre)) return false;
-    if (filters.q && !includesTag([profile.stageName, profile.location, ...profile.instruments, ...profile.subgenres], filters.q)) return false;
-    if (filters.genre.length && !filters.genre.some((genre) =>
-      profile.genres.some((entry) => entry.genre.slug === genre) || includesTag(profile.subgenres, genre))) return false;
+
+    const genreSlugs = profile.genrePicks.map((p) => p.subtype.slug);
+    const customGenreLabels = profile.genrePicks.map((p) => p.customLabel).filter((v): v is string => Boolean(v));
+    if (filters.q && !includesTag([profile.stageName, profile.location, ...profile.instruments, ...customGenreLabels], filters.q)) return false;
+    if (filters.genre.length && !filters.genre.some((genre) => genreSlugs.includes(genre) || includesTag(customGenreLabels, genre))) return false;
+
     if (filters.availableOn) {
       const day = Date.parse(filters.availableOn);
       const nextDay = day + 86400000;
@@ -53,11 +58,60 @@ export async function discoverArtists(filters: z.infer<typeof discoveryQuerySche
     return true;
   }).map(serializeMusicianProfile).filter((artist) =>
     filters.sortBy === "blind_scout" || filters.minRating === undefined || artist.weightedRating >= filters.minRating);
-  if (filters.sortBy === "blind_scout") return rankBlindScout(results, filters.genre);
-  return results.sort((a, b) => {
+
+  const withRateInfo = applyRateFilter(results, filters.minFee, filters.maxFee, filters.feeBasis);
+
+  if (filters.sortBy === "blind_scout") return rankBlindScout(withRateInfo, filters.genre);
+  return withRateInfo.sort((a, b) => {
     if (filters.sortBy === "name") return a.stageName.localeCompare(b.stageName);
     if (filters.sortBy === "experience") return b.experienceYears - a.experienceYears;
     if (filters.sortBy === "newest") return b.createdAt.localeCompare(a.createdAt);
     return b.weightedRating - a.weightedRating || a.stageName.localeCompare(b.stageName);
   });
+}
+
+type Serialized = ReturnType<typeof serializeMusicianProfile>;
+
+/**
+ * Applies a tiered-leeway budget filter when the venue has specified a
+ * min/max fee. Checks whichever of performance/hourly/day fee the venue
+ * indicated (`feeBasis`), falling back to checking any fee the artist has
+ * quoted so an artist who only set an hourlyFee isn't invisible to a
+ * flat-budget search. Attaches `rateMatch` (delta info) to each surviving
+ * result so the UI can show "10% above your budget" rather than silently
+ * widening results.
+ */
+function applyRateFilter<T extends Serialized>(
+  artists: T[],
+  minFee: number | undefined,
+  maxFee: number | undefined,
+  feeBasis: "performance" | "hourly" | "day" | undefined
+): (T & { rateMatch?: { deltaPercent: number; direction: "above" | "below" } })[] {
+  if (minFee === undefined && maxFee === undefined) return artists;
+  const min = minFee ?? 0;
+  const max = maxFee ?? Infinity;
+
+  const feeFor = (artist: Serialized) => {
+    if (feeBasis === "performance") return artist.performanceFee;
+    if (feeBasis === "hourly") return artist.hourlyFee;
+    if (feeBasis === "day") return artist.dayFee;
+    return artist.performanceFee ?? artist.hourlyFee ?? artist.dayFee;
+  };
+
+  const out: (T & { rateMatch?: { deltaPercent: number; direction: "above" | "below" } })[] = [];
+  for (const artist of artists) {
+    const fee = feeFor(artist);
+    if (fee == null) {
+      out.push(artist);
+      continue;
+    }
+    const result = withinLeeway(fee, min, Number.isFinite(max) ? max : fee);
+    if (!result.inRange) continue;
+    if (result.deltaPercent !== null && result.direction) {
+      out.push({ ...artist, rateMatch: { deltaPercent: result.deltaPercent, direction: result.direction } });
+    } else {
+      out.push(artist);
+    }
+  }
+  return out;
 }

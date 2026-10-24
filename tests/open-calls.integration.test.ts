@@ -53,8 +53,18 @@ if (enabled) {
 
 async function fixture() {
   const venueUser = await prisma.user.create({ data: { email: `${randomUUID()}@integration.invalid`, role: "venue", venueProfile: { create: { venueName: "Fixture venue", stripeCustomerId: `cus_${randomUUID()}` } } }, include: { venueProfile: true } });
+  const soundEngineerSubtype = await prisma.categorySubtype.findUniqueOrThrow({ where: { slug: "audio-mixing-mastering-engineer" } });
   const artists = await Promise.all([0, 1].map(async (index) => prisma.user.create({
-    data: { email: `${randomUUID()}@integration.invalid`, role: "musician", musicianProfile: { create: { stageName: `Fixture ${index}`, primaryCategory: "sound_engineer", instruments: ["Electric Guitar"], subgenres: ["Dream pop"], performanceFee: 200, rating: 5, reviewCount: index ? 50 : 1, availabilitySlots: { create: { startDate: new Date("2099-11-01"), endDate: new Date("2099-11-02") } } } } },
+    data: {
+      email: `${randomUUID()}@integration.invalid`, role: "musician",
+      musicianProfile: {
+        create: {
+          stageName: `Fixture ${index}`, instruments: ["Electric Guitar"], performanceFee: 200, rating: 5, reviewCount: index ? 50 : 1,
+          categoryPicks: { create: { subtypeId: soundEngineerSubtype.id } },
+          availabilitySlots: { create: { startDate: new Date("2099-11-01"), endDate: new Date("2099-11-02") } },
+        },
+      },
+    },
     include: { musicianProfile: true },
   })));
   userIds.push(venueUser.id, ...artists.map((artist) => artist.id));
@@ -77,7 +87,7 @@ async function fixture() {
 
 test("isolated PostgreSQL: discovery normalizes categories, instruments and weighted ordering, excluding deleted users", { skip: !enabled }, async () => {
   const data = await fixture();
-  const results = await discoverArtists(discoveryQuerySchema.parse({ category: ["sound-engineer"], instrument: "gUiTaR" }));
+  const results = await discoverArtists(discoveryQuerySchema.parse({ category: ["audio-mixing-mastering-engineer"], instrument: "gUiTaR" }));
   assert.ok(results.find((artist) => artist.id === data.artists[0].id));
   assert.ok(results.findIndex((artist) => artist.id === data.artists[1].id) < results.findIndex((artist) => artist.id === data.artists[0].id));
   await prisma.user.update({ where: { id: data.artists[0].userId }, data: { deletedAt: new Date() } });

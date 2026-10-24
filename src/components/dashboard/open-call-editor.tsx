@@ -4,13 +4,22 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { GENRES } from "@/config";
+import { HierarchicalPicker } from "@/components/common/hierarchical-picker";
+import { GENRE_GROUPS } from "@/config";
 import type { OpenCallRow } from "@/lib/open-calls";
 import type { EquipmentItem } from "@/types";
 import { eventInstants } from "@/lib/open-call-utils";
 
+const GENRE_PICKER_GROUPS = GENRE_GROUPS.map((g) => ({
+  id: g.slug, name: g.name, children: g.subgenres.map((s) => ({ id: s.slug, name: s.name })),
+}));
+const ALL_SUBGENRE_SLUGS = new Set(GENRE_GROUPS.flatMap((g) => g.subgenres.map((s) => s.slug)));
+
 export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { initial?: OpenCallRow; copy?: boolean; onSaved: () => void; onCancel: () => void }) {
-  const [genres, setGenres] = useState(initial?.genres.filter((slug) => GENRES.some((genre) => genre.slug === slug)) ?? []);
+  const [genres, setGenres] = useState(initial?.genres.filter((slug) => ALL_SUBGENRE_SLUGS.has(slug)) ?? []);
+  const [genreGroups, setGenreGroups] = useState(
+    Array.from(new Set(genres.map((slug) => GENRE_GROUPS.find((g) => g.subgenres.some((s) => s.slug === slug))?.slug).filter((v): v is string => Boolean(v))))
+  );
   const [slots, setSlots] = useState(initial?.slots.map((slot) => ({ label: slot.label, budgetMin: slot.budgetMin == null ? "" : String(slot.budgetMin), budgetMax: slot.budgetMax == null ? "" : String(slot.budgetMax) })) ?? [{ label: "Performance", budgetMin: "", budgetMax: "" }]);
   const [useVenueEquipment, setUseVenueEquipment] = useState(initial?.useVenueEquipment ?? true);
   const [equipment, setEquipment] = useState(initial?.eventEquipment ?? []);
@@ -40,7 +49,7 @@ export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { i
           timeZone: text("timeZone"), location: text("location"), venueAddress: text("venueAddress"),
           externalVenueName: text("externalVenueName"), stageSpecs: text("stageSpecs"),
           budgetMin: Number(text("budgetMin")), budgetMax: Number(text("budgetMax")), currency: "EUR",
-          applicationDeadline, genres: [...genres, ...text("subgenres").split(",").map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean)], useVenueEquipment, eventEquipment: equipment,
+          applicationDeadline, genres, useVenueEquipment, eventEquipment: equipment,
           equipmentProvided: equipment.map((item) => `${item.quantity}× ${catalog.find((entry) => entry.id === item.equipmentId)?.name ?? "Equipment"}`),
           requiredServices: text("requiredServices").split(",").map((item) => item.trim()).filter(Boolean),
           slots: slots.map((slot) => ({ label: slot.label, budgetMin: slot.budgetMin === "" ? null : Number(slot.budgetMin), budgetMax: slot.budgetMax === "" ? null : Number(slot.budgetMax) })),
@@ -68,8 +77,27 @@ export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { i
       <div className="grid gap-4 sm:grid-cols-3">{field("eventDate", "Event date", initial?.eventDate, "date")}{field("startTime", "Start time", initial?.startTime, "time")}{field("endTime", "End time", initial?.endTime, "time")}</div>
       <div className="grid gap-4 sm:grid-cols-2">{field("timeZone", "Event time zone (IANA)", timeZone)}{field("applicationDeadline", "Apply before (event time zone)", deadlineValue, "datetime-local")}</div>
       <div className="grid gap-4 sm:grid-cols-2">{field("location", "City / region", initial?.location)}{field("venueAddress", "Event address", initial?.venueAddress)}{field("externalVenueName", "Partner / external venue (for promoters)", initial?.externalVenueName)}</div>
-      <fieldset><legend className="mb-3 text-sm font-medium">Target genres</legend><div className="flex flex-wrap gap-2">{GENRES.map((genre) => <button key={genre.slug} type="button" aria-pressed={genres.includes(genre.slug)} onClick={() => setGenres((previous) => previous.includes(genre.slug) ? previous.filter((item) => item !== genre.slug) : [...previous, genre.slug])} className={`rounded-full border px-3 py-1.5 text-xs ${genres.includes(genre.slug) ? "border-brand bg-brand-soft text-brand" : "border-line text-muted"}`}>{genre.name}</button>)}</div></fieldset>
-      {field("subgenres", "Target subgenres (comma-separated, optional)", initial?.genres.filter((slug) => !GENRES.some((genre) => genre.slug === slug)).join(", "))}
+      <fieldset>
+        <legend className="mb-3 text-sm font-medium">Target genres</legend>
+        <p className="mb-2 text-xs text-muted">Not limited to one genre or group — target whichever genres and subgenres fit this call.</p>
+        <HierarchicalPicker
+          groups={GENRE_PICKER_GROUPS}
+          selectedGroupIds={genreGroups}
+          selectedChildIds={genres}
+          onGroupToggle={(groupId) => setGenreGroups((prev) => {
+            if (prev.includes(groupId)) {
+              const group = GENRE_PICKER_GROUPS.find((g) => g.id === groupId);
+              if (group) setGenres((cur) => cur.filter((id) => !group.children.some((c) => c.id === id)));
+              return prev.filter((g) => g !== groupId);
+            }
+            return [...prev, groupId];
+          })}
+          onChildToggle={(slug) => setGenres((prev) => prev.includes(slug) ? prev.filter((g) => g !== slug) : [...prev, slug])}
+          mode="filter"
+          groupLabel="Genre"
+          childLabel="Subgenre"
+        />
+      </fieldset>
       <div className="grid gap-4 sm:grid-cols-2">{field("budgetMin", "Minimum artist fee (EUR)", initial?.budgetMin, "number")}{field("budgetMax", "Maximum artist fee (EUR)", initial?.budgetMax, "number")}</div>
       <fieldset className="space-y-3"><legend className="mb-2 text-sm font-medium">Lineup slots</legend><p className="text-xs text-muted">One artist per slot. Optional slot budgets override the call&apos;s range; fill both limits or neither.</p>{slots.map((slot, index) => <div key={index} className="grid gap-2 rounded-xl border border-line p-3 sm:grid-cols-[1fr_110px_110px_auto]"><Input aria-label={`Slot ${index + 1} label`} value={slot.label} onChange={(event) => setSlots((previous) => previous.map((item, position) => position === index ? { ...item, label: event.target.value } : item))} placeholder="Opener / Support / Co-headliner" />{(["budgetMin", "budgetMax"] as const).map((key) => <Input key={key} aria-label={`Slot ${index + 1} ${key}`} type="number" min={0} step="0.01" placeholder={key === "budgetMin" ? "Min EUR" : "Max EUR"} value={slot[key]} onChange={(event) => setSlots((previous) => previous.map((item, position) => position === index ? { ...item, [key]: event.target.value } : item))} />)}<Button type="button" variant="ghost" disabled={slots.length === 1} onClick={() => setSlots((previous) => previous.filter((_, position) => position !== index))}>Remove</Button></div>)}<Button type="button" variant="outline" disabled={slots.length >= 20} onClick={() => setSlots((previous) => [...previous, { label: "", budgetMin: "", budgetMax: "" }])}>Add lineup slot</Button></fieldset>
       <div><label htmlFor="call-stageSpecs" className="mb-2 block text-sm font-medium">Stage setup & technical specifications</label><textarea id="call-stageSpecs" name="stageSpecs" defaultValue={initial?.stageSpecs} maxLength={3000} className="min-h-24 w-full rounded-xl border border-line bg-surface p-3 text-sm" placeholder="Stage dimensions, power, access, soundcheck, limits…" /></div>

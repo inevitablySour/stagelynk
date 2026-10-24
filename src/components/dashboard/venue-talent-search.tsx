@@ -2,29 +2,45 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, SlidersHorizontal, X, MapPin, Clock } from "lucide-react";
+import { Search, SlidersHorizontal, MapPin, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StarRating } from "@/components/common/star-rating";
-import { CREATIVE_CATEGORIES } from "@/config";
+import { HierarchicalPicker } from "@/components/common/hierarchical-picker";
+import { CATEGORY_GROUPS } from "@/config";
 import { getInitials } from "@/lib/utils";
 import type { MusicianProfile } from "@/types";
 
+const CATEGORY_PICKER_GROUPS = CATEGORY_GROUPS.map((g) => ({
+  id: g.slug, name: g.name, children: g.subcategories.map((s) => ({ id: s.slug, name: s.name })),
+}));
+
 export function VenueTalentSearch({ talent }: { talent: MusicianProfile[] }) {
   const [query, setQuery] = useState("");
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
-  const toggleCategory = (name: string) => {
-    setSelectedCategories((prev) => (prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]));
+  const toggleGroup = (groupId: string) => {
+    setSelectedGroups((prev) => {
+      if (prev.includes(groupId)) {
+        const group = CATEGORY_PICKER_GROUPS.find((g) => g.id === groupId);
+        if (group) setSelectedCategories((cur) => cur.filter((id) => !group.children.some((c) => c.id === id)));
+        return prev.filter((g) => g !== groupId);
+      }
+      return [...prev, groupId];
+    });
+  };
+  const toggleCategory = (slug: string) => {
+    setSelectedCategories((prev) => (prev.includes(slug) ? prev.filter((c) => c !== slug) : [...prev, slug]));
   };
 
   const filtered = talent.filter((t) => {
     const matchesQuery =
       !query || t.stageName.toLowerCase().includes(query.toLowerCase()) || t.location.toLowerCase().includes(query.toLowerCase());
-    const matchesCat = selectedCategories.length === 0 || selectedCategories.includes(t.primaryCategory ?? "");
+    const matchesCat = selectedCategories.length === 0 || t.categoryPicks.some((p) => selectedCategories.includes(p.subtypeSlug));
     return matchesQuery && matchesCat;
   });
 
@@ -47,27 +63,21 @@ export function VenueTalentSearch({ talent }: { talent: MusicianProfile[] }) {
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-stone-700">Creative Categories</span>
             {selectedCategories.length > 0 && (
-              <button className="text-xs text-olive-600 hover:underline" onClick={() => setSelectedCategories([])}>
+              <button className="text-xs text-olive-600 hover:underline" onClick={() => { setSelectedGroups([]); setSelectedCategories([]); }}>
                 Clear all
               </button>
             )}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {CREATIVE_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => toggleCategory(cat.id)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                  selectedCategories.includes(cat.id)
-                    ? "border-olive-500 bg-olive-100 text-olive-700"
-                    : "border-stone-200 text-stone-600 hover:border-stone-300"
-                }`}
-              >
-                {cat.name}
-                {selectedCategories.includes(cat.id) && <X className="ml-1 inline h-3 w-3" />}
-              </button>
-            ))}
-          </div>
+          <HierarchicalPicker
+            groups={CATEGORY_PICKER_GROUPS}
+            selectedGroupIds={selectedGroups}
+            selectedChildIds={selectedCategories}
+            onGroupToggle={toggleGroup}
+            onChildToggle={toggleCategory}
+            mode="filter"
+            groupLabel="Category"
+            childLabel="Role"
+          />
         </div>
       )}
 
@@ -85,7 +95,7 @@ export function VenueTalentSearch({ talent }: { talent: MusicianProfile[] }) {
                   <div className="min-w-0">
                     <h3 className="font-semibold text-stone-900 group-hover:text-olive-600 truncate">{t.stageName}</h3>
                     <p className="text-xs text-stone-500">
-                      {CREATIVE_CATEGORIES.find((c) => c.id === t.primaryCategory)?.name ?? "Creative"}
+                      {t.categoryPicks[0]?.groupName ?? "Creative"}
                     </p>
                   </div>
                 </div>
@@ -95,7 +105,7 @@ export function VenueTalentSearch({ talent }: { talent: MusicianProfile[] }) {
                 </div>
                 <StarRating rating={t.rating} size="sm" showValue reviewCount={t.reviewCount} />
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {t.genres.map((g) => <Badge key={g.id} variant="secondary" className="text-[10px]">{g.name}</Badge>)}
+                  {t.genrePicks.map((p) => <Badge key={p.subtypeId} variant="secondary" className="text-[10px]">{p.customLabel ?? p.subtypeName}</Badge>)}
                 </div>
               </CardContent>
             </Card>

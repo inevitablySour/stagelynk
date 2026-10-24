@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { JobListings, type PublicJobListing } from "@/components/jobs/job-listings";
 import { Input } from "@/components/ui/input";
-import { GENRES } from "@/config";
+import { HierarchicalPicker } from "@/components/common/hierarchical-picker";
+import { GENRE_GROUPS } from "@/config";
+
+const GENRE_PICKER_GROUPS = GENRE_GROUPS.map((g) => ({
+  id: g.slug, name: g.name, children: g.subgenres.map((s) => ({ id: s.slug, name: s.name })),
+}));
 
 export function OpenCallFeed({ initial, canMatch = false, excludedIds = [], onApply, ctaLabel = "Sign up to apply", ctaHref = "/register" }: {
   initial: PublicJobListing[]; canMatch?: boolean; excludedIds?: string[];
@@ -11,8 +16,8 @@ export function OpenCallFeed({ initial, canMatch = false, excludedIds = [], onAp
 }) {
   const [jobs, setJobs] = useState(initial);
   const [query, setQuery] = useState("");
+  const [genreGroup, setGenreGroup] = useState<string | null>(null);
   const [genre, setGenre] = useState("");
-  const [subgenre, setSubgenre] = useState("");
   const [minBudget, setMinBudget] = useState("");
   const [maxBudget, setMaxBudget] = useState("");
   const [technicalFit, setTechnicalFit] = useState(false);
@@ -26,7 +31,6 @@ export function OpenCallFeed({ initial, canMatch = false, excludedIds = [], onAp
         const params = new URLSearchParams();
         if (query) params.set("q", query);
         if (genre) params.set("genre", genre);
-        if (subgenre) params.set("subgenre", subgenre);
         if (minBudget) params.set("minBudget", minBudget);
         if (maxBudget) params.set("maxBudget", maxBudget);
         if (technicalFit) params.set("technicalFit", "true");
@@ -38,17 +42,29 @@ export function OpenCallFeed({ initial, canMatch = false, excludedIds = [], onAp
       finally { if (!controller.signal.aborted) setLoading(false); }
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, genre, subgenre, minBudget, maxBudget, technicalFit]);
+  }, [query, genre, minBudget, maxBudget, technicalFit]);
   const visible = jobs.filter((job) => !excludedIds.includes(job.id));
   return <>
     <div className="mb-6 space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div><label htmlFor="call-search" className="mb-2 block text-xs font-medium text-muted">Title / location</label><Input id="call-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search open calls" /></div>
-        <div><label htmlFor="call-genre-filter" className="mb-2 block text-xs font-medium text-muted">Genre</label><select id="call-genre-filter" value={genre} onChange={(event) => setGenre(event.target.value)} className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm"><option value="">All genres</option>{GENRES.map((item) => <option key={item.slug} value={item.slug}>{item.name}</option>)}</select></div>
         <div><label htmlFor="call-min-budget" className="mb-2 block text-xs font-medium text-muted">Minimum compensation (EUR)</label><Input id="call-min-budget" type="number" min={0} value={minBudget} onChange={(event) => setMinBudget(event.target.value)} /></div>
         <div><label htmlFor="call-max-budget" className="mb-2 block text-xs font-medium text-muted">Maximum compensation (EUR)</label><Input id="call-max-budget" type="number" min={0} value={maxBudget} onChange={(event) => setMaxBudget(event.target.value)} /></div>
       </div>
-      <div><label htmlFor="call-subgenre-filter" className="mb-2 block text-xs font-medium text-muted">Subgenre</label><Input id="call-subgenre-filter" value={subgenre} onChange={(event) => setSubgenre(event.target.value)} placeholder="e.g. dream pop" className="max-w-sm" /></div>
+      <div>
+        <p className="mb-2 text-xs font-medium text-muted">Genre</p>
+        <HierarchicalPicker
+          groups={GENRE_PICKER_GROUPS}
+          selectedGroupIds={genreGroup ? [genreGroup] : []}
+          selectedChildIds={genre ? [genre] : []}
+          onGroupToggle={(groupId) => { setGenreGroup((prev) => (prev === groupId ? null : groupId)); setGenre(""); }}
+          onChildToggle={(slug) => setGenre((prev) => (prev === slug ? "" : slug))}
+          maxChildrenPerGroup={1}
+          mode="single-select-group"
+          groupLabel="Genre"
+          childLabel="Subgenre"
+        />
+      </div>
       {canMatch && <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={technicalFit} onChange={(event) => setTechnicalFit(event.target.checked)} />Only show events covering my technical rider</label>}
       <p role="status" className="text-xs text-muted">{loading ? "Refreshing open calls…" : `${visible.length} open opportunities`}</p>
     </div>

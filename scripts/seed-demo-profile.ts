@@ -51,7 +51,9 @@ async function main() {
 
   const existing = await prisma.user.findUnique({ where: { email: demoEmail }, include: { musicianProfile: true } });
   if (existing && (!existing.musicianProfile?.stageName.startsWith("DEMO") || existing.role !== "musician")) throw new Error("Refusing to overwrite a non-demo account.");
-  const genres = await prisma.genre.findMany({ where: { slug: { in: ["pop", "latin", "electronic", "hip-hop"] } } });
+  const electronicDanceGroup = await prisma.genreGroup.findUniqueOrThrow({ where: { slug: "electronic-dance" } });
+  const subgenres = await prisma.genreSubtype.findMany({ where: { slug: { in: ["house", "synthwave", "downtempo-chillout"] } } });
+  const djSubtype = await prisma.categorySubtype.findUniqueOrThrow({ where: { slug: "dj" } });
   const catalog = await prisma.equipmentItem.findMany();
   const idFor = (slug: string) => {
     const item = catalog.find((entry) => entry.slug === slug);
@@ -68,12 +70,11 @@ async function main() {
     });
     const details = {
       stageName: "DEMO — Nova Sol",
-      primaryCategory: "dj",
+      mainGenreGroupId: electronicDanceGroup.id,
       bio: "DEMO PROFILE — a fictional creative used to demonstrate StageLynk. This is not a real performer or a booking offer.\n\nExample Brussels-based DJ, vocalist and keyboard player with a bright Latin-pop and electronic sound. Sample services include a 90-minute live/DJ set, acoustic reception music, session keys and small-stage production.\n\nThe Spotify releases below are credited Pitbull reference material, not Nova Sol's recordings. Artwork, track names and durations come from Spotify. Credentials, reviews and past projects on this profile are explicitly fictional demo examples; no payments or payouts were made.",
       experienceYears: 7,
       location: "Brussels, Belgium · demo location",
       instruments: ["Vocals", "DJ controller", "Keyboard", "Percussion"],
-      subgenres: ["Latin pop", "Dance pop", "Nu disco", "Electro house"],
       influences: ["Pitbull", "Stromae", "Daft Punk", "Latin club music"],
       favorites: ["Pitbull — Globalization", "Daft Punk — Discovery", "Stromae — Racine carrée", "Parcels — Day/Night"],
       performanceFee: 350,
@@ -95,8 +96,10 @@ async function main() {
       spotifyConnected: false,
     };
     const creative = await tx.musicianProfile.upsert({ where: { userId: user.id }, update: details, create: { ...details, userId: user.id } });
-    await tx.musicianGenre.deleteMany({ where: { musicianId: creative.id } });
-    await tx.musicianGenre.createMany({ data: genres.map((genre) => ({ musicianId: creative.id, genreId: genre.id })) });
+    await tx.musicianGenreSubtypePick.deleteMany({ where: { musicianId: creative.id } });
+    await tx.musicianGenreSubtypePick.createMany({ data: subgenres.map((subtype) => ({ musicianId: creative.id, subtypeId: subtype.id })) });
+    await tx.musicianCategoryPick.deleteMany({ where: { musicianId: creative.id } });
+    await tx.musicianCategoryPick.create({ data: { musicianId: creative.id, subtypeId: djSubtype.id } });
     await tx.credential.deleteMany({ where: { musicianId: creative.id } });
     await tx.credential.createMany({ data: [
       { musicianId: creative.id, type: "degree", title: "DEMO — BA in Music Production", issuer: "Example Creative Academy (fictional)", year: 2020 },

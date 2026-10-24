@@ -25,7 +25,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const applications = await prisma.jobApplication.findMany({
     where: { jobListingId, musician: { user: { deletedAt: null } } },
     include: {
-      musician: { include: { genres: { include: { genre: true } } } },
+      musician: { include: { genrePicks: { include: { subtype: true } } } },
       slot: true,
       booking: { select: { paymentStatus: true, status: true } },
     },
@@ -36,7 +36,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   const scored = await Promise.all(
     applications.map(async (a) => {
-      const artistGenreSlugs = [...a.musician.genres.map((mg) => mg.genre.slug), ...a.musician.subgenres];
+      const artistGenreSlugs = a.musician.genrePicks.map((p) => p.subtype.slug);
       const technicalGaps = await getListingTechnicalGaps(a.musicianId, listing);
       const budget = effectiveBudget(a.slot, listing);
       const fit = await scoreApplication({
@@ -69,7 +69,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
           rating: a.musician.rating,
           reviewCount: a.musician.reviewCount,
           experienceYears: a.musician.experienceYears,
-          genres: a.musician.genres.map((mg) => mg.genre.name),
+          genres: a.musician.genrePicks.map((p) => p.customLabel ?? p.subtype.name),
         },
         fit,
       };

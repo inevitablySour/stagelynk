@@ -8,7 +8,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const profile = await prisma.musicianProfile.findUnique({
     where: { id, user: { deletedAt: null } },
     include: {
-      genres: { include: { genre: true } },
+      mainGenreGroup: true,
+      genrePicks: { include: { subtype: true } },
+      categoryPicks: { include: { subtype: { include: { group: true } }, instrumentType: true } },
       services: { include: { service: true } },
       albums: { include: { tracks: true } },
       credentials: true,

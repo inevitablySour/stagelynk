@@ -11,7 +11,7 @@ export async function GET() {
 
   const me = await prisma.musicianProfile.findUnique({
     where: { userId: session.user.id },
-    include: { genres: { include: { genre: true } } },
+    include: { genrePicks: { include: { subtype: true } } },
   });
   if (!me) {
     return NextResponse.json({ success: false, message: "Profile not found" }, { status: 404 });
@@ -27,7 +27,7 @@ export async function GET() {
     prisma.musicianProfile.findMany({
       where: { id: { not: me.id }, user: { deletedAt: null } },
       include: {
-        genres: { include: { genre: true } },
+        genrePicks: { include: { subtype: true } },
         p2pQuestionnaireResponse: true,
       },
       take: 100,
@@ -43,14 +43,14 @@ export async function GET() {
     .filter((p) => !excludedIds.has(p.id))
     .map((p) => ({
       musicianId: p.id,
-      genreSlugs: p.genres.map((mg) => mg.genre.slug),
+      genreSlugs: p.genrePicks.map((pick) => pick.subtype.slug),
       answers: (p.p2pQuestionnaireResponse?.answers as Record<string, string | string[] | null>) ?? null,
     }));
 
   const ranked = await rankP2PCandidates(
     me.id,
     candidates,
-    me.genres.map((mg) => mg.genre.slug),
+    me.genrePicks.map((pick) => pick.subtype.slug),
     (myQuestionnaire?.answers as Record<string, string | string[] | null>) ?? null
   );
 
@@ -62,7 +62,7 @@ export async function GET() {
       stageName: profile.stageName,
       profileImage: profile.profileImage,
       location: profile.location,
-      genres: profile.genres.map((mg) => mg.genre.name),
+      genres: profile.genrePicks.map((pick) => pick.customLabel ?? pick.subtype.name),
       fit: { equipmentFit: r.equipmentFit, genreFit: r.genreFit, questionnaireFit: r.questionnaireFit },
     };
   });

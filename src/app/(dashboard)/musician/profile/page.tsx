@@ -18,7 +18,9 @@ export default async function MusicianProfilePage() {
   const profile = await prisma.musicianProfile.findUnique({
     where: { userId: session.user.id },
     include: {
-      genres: { include: { genre: true } },
+      mainGenreGroup: true,
+      genrePicks: { include: { subtype: true } },
+      categoryPicks: { include: { subtype: true, instrumentType: true } },
       services: { include: { service: true } },
       equipmentNeeds: true,
       equipmentOwned: true,
@@ -43,7 +45,9 @@ export default async function MusicianProfilePage() {
               bio: profile.bio,
               location: profile.location,
               experienceYears: profile.experienceYears,
-              genreSlugs: profile.genres.map((mg) => mg.genre.slug),
+              mainGenreGroupSlug: profile.mainGenreGroup?.slug ?? null,
+              genreSubtypeSlugs: profile.genrePicks.map((p) => p.subtype.slug),
+              genreCustomLabel: profile.genrePicks.find((p) => p.customLabel)?.customLabel ?? null,
               serviceSlugs: profile.services.map((ms) => ms.service.slug),
               instruments: profile.instruments,
             }}
@@ -51,7 +55,8 @@ export default async function MusicianProfilePage() {
 
           <MusicianSocialForm initial={(profile.socialLinks as SocialLinks) ?? {}} />
           <ArtistDiscoveryDetailsForm initial={{
-            primaryCategory: profile.primaryCategory, subgenres: profile.subgenres, influences: profile.influences,
+            categoryPicks: profile.categoryPicks.map((p) => ({ subtypeSlug: p.subtype.slug, instrumentTypeSlug: p.instrumentType?.slug })),
+            influences: profile.influences,
             favorites: profile.favorites, performanceFee: profile.performanceFee, hourlyFee: profile.hourlyFee,
             dayFee: profile.dayFee, profileImage: profile.profileImage, bannerImage: profile.bannerImage,
           }} />

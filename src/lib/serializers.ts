@@ -4,7 +4,9 @@ import { computeWeightedRating } from "@/lib/rating";
 
 type MusicianWithRelations = Prisma.MusicianProfileGetPayload<{
   include: {
-    genres: { include: { genre: true } };
+    mainGenreGroup: true;
+    genrePicks: { include: { subtype: true } };
+    categoryPicks: { include: { subtype: { include: { group: true } }; instrumentType: true } };
     services: { include: { service: true } };
     albums: { include: { tracks: true } };
     credentials?: true;
@@ -18,7 +20,17 @@ export function serializeMusicianProfile(profile: MusicianWithRelations): Musici
     userId: profile.userId,
     stageName: profile.stageName,
     bio: profile.bio,
-    genres: profile.genres.map((mg) => mg.genre),
+    mainGenreGroup: profile.mainGenreGroup
+      ? { id: profile.mainGenreGroup.id, name: profile.mainGenreGroup.name, slug: profile.mainGenreGroup.slug }
+      : null,
+    genrePicks: profile.genrePicks.map((p) => ({
+      subtypeId: p.subtype.id, subtypeName: p.subtype.name, subtypeSlug: p.subtype.slug, customLabel: p.customLabel,
+    })),
+    categoryPicks: profile.categoryPicks.map((p) => ({
+      subtypeId: p.subtype.id, subtypeName: p.subtype.name, subtypeSlug: p.subtype.slug,
+      groupName: p.subtype.group.name, groupSlug: p.subtype.group.slug,
+      instrumentTypeName: p.instrumentType?.name ?? null, instrumentTypeSlug: p.instrumentType?.slug ?? null,
+    })),
     services: profile.services.map((ms) => ms.service),
     experienceYears: profile.experienceYears,
     location: profile.location,
@@ -31,7 +43,6 @@ export function serializeMusicianProfile(profile: MusicianWithRelations): Musici
       endDate: slot.endDate.toISOString(),
     })),
     instruments: profile.instruments,
-    subgenres: profile.subgenres,
     influences: profile.influences,
     favorites: profile.favorites,
     performanceFee: profile.performanceFee,
@@ -48,7 +59,6 @@ export function serializeMusicianProfile(profile: MusicianWithRelations): Musici
     weightedRating: computeWeightedRating(profile.rating, profile.reviewCount),
     reviewCount: profile.reviewCount,
     discography: profile.albums.map(serializeAlbum),
-    primaryCategory: profile.primaryCategory,
     createdAt: profile.createdAt.toISOString(),
   };
 }

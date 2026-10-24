@@ -28,7 +28,7 @@ export function rankBlindScout(artists: MusicianProfile[], activeGenreSlugs: str
   return [...artists]
     .map((artist) => {
       const genreMatchCount = activeGenreSlugs.length
-        ? artist.genres.filter((g) => activeGenreSlugs.includes(g.slug)).length
+        ? artist.genrePicks.filter((p) => activeGenreSlugs.includes(p.subtypeSlug)).length
         : 0;
       const hasPortfolio = artist.discography.some((album) => album.tracks.some((track) => Boolean(track.previewUrl)) || (album.source === "spotify" && Boolean(spotifyEmbedUrl(album.externalUrl)))) ? 1 : 0;
       const rotation = dailyRotationSeed(artist.id) % 1000;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calendarDate, discoveryQuerySchema, includesTag, normalizeCategory } from "../src/lib/discovery-utils";
+import { calendarDate, discoveryQuerySchema, includesTag } from "../src/lib/discovery-utils";
 import { eventInstants, isCallOpen, effectiveBudget } from "../src/lib/open-call-utils";
 import { validateCallForPublishing } from "../src/lib/open-call-validation";
 import { compareEquipment, formatGapAlert } from "../src/lib/technical-gap";
@@ -14,12 +14,10 @@ test("discovery rejects invalid dates, ratings and numeric filters", () => {
   for (const filters of [{ minRating: 11 }, { minRating: "oops" }, { experienceMin: -1 }, { availableOn: "2026-02-30" }, { sortBy: "popularity" }]) assert.equal(discoveryQuerySchema.safeParse(filters).success, false);
   assert.equal(calendarDate.safeParse("2028-02-29").success, true);
   assert.equal(includesTag(["Electric Guitar"], "gUiTaR"), true);
-  assert.equal(normalizeCategory("voice_actor"), "voice-actor");
-  assert.equal(normalizeCategory("sound-engineer"), "sound-engineer");
 });
 
-test("profile categories, rates, favorites and image protocols are validated", () => {
-  assert.equal(musicianProfileSchema.partial().parse({ primaryCategory: "sound_engineer" }).primaryCategory, "sound-engineer");
+test("profile rates, favorites, genre picks and image protocols are validated", () => {
+  assert.equal(musicianProfileSchema.partial().parse({ mainGenreGroupSlug: "rock", genrePicks: [{ subtypeSlug: "punk-rock" }] }).mainGenreGroupSlug, "rock");
   for (const profile of [{ performanceFee: -1 }, { performanceFee: 1.001 }, { favorites: ["a", "b", "c", "d", "e"] }, { profileImage: "javascript:alert(1)" }]) assert.equal(musicianProfileSchema.partial().safeParse(profile).success, false);
 });
 
@@ -79,7 +77,7 @@ test("application fit uses supplied event gaps rather than querying permanent ve
 });
 
 test("Blind Scout prefers playable work over empty albums, not review counts", () => {
-  const base = { genres: [], discography: [], rating: 0, reviewCount: 0 } as unknown as MusicianProfile;
+  const base = { genrePicks: [], discography: [], rating: 0, reviewCount: 0 } as unknown as MusicianProfile;
   const artists = [
     { ...base, id: "established", rating: 5, reviewCount: 100, discography: [{ tracks: [] }] },
     { ...base, id: "emerging", discography: [{ tracks: [{ previewUrl: "https://example.test/raw.mp3" }] }] },

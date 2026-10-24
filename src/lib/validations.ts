@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { calendarDate, normalizeCategory, normalizeTags } from "@/lib/discovery-utils";
+import { calendarDate, normalizeTags } from "@/lib/discovery-utils";
 
 const money = z.number().finite().min(0).max(1000000).multipleOf(0.01);
 const tags = z.array(z.string().trim().min(1).max(80)).max(20).transform(normalizeTags);
@@ -93,17 +93,32 @@ export const socialLinksSchema = z.object({
   tiktok: z.string().max(300).optional(),
 });
 
+// A musician picks up to 3 subcategories per broad CategoryGroup. Each pick
+// names the subcategory slug and, only for "Instrumentalist & Session
+// Musician", an instrument type slug.
+const categoryPickSchema = z.object({
+  subtypeSlug: z.string().min(1).max(80),
+  instrumentTypeSlug: z.string().min(1).max(80).optional(),
+});
+
+// Exactly one main GenreGroup, 1-3 subgenre picks from within that group.
+// A pick pointing at the group's "Other" row carries a free-text customLabel.
+const genreSubtypePickSchema = z.object({
+  subtypeSlug: z.string().min(1).max(80),
+  customLabel: z.string().trim().min(1).max(80).optional(),
+});
+
 export const musicianProfileSchema = z.object({
   stageName: z.string().min(1, "Stage name is required"),
   bio: z.string().max(2000).optional(),
   experienceYears: z.number().min(0).max(100).optional(),
   location: z.string().optional(),
-  genres: z.array(z.string()).optional(),
   services: z.array(z.string()).optional(),
   socialLinks: socialLinksSchema.optional(),
   instruments: z.array(z.string().max(60)).max(20).optional(),
-  primaryCategory: z.string().refine((value) => Boolean(normalizeCategory(value)), "Choose a creative category").transform((value) => normalizeCategory(value)!).optional(),
-  subgenres: tags.optional(),
+  categoryPicks: z.array(categoryPickSchema).max(60).optional(),
+  mainGenreGroupSlug: z.string().min(1).max(80).optional(),
+  genrePicks: z.array(genreSubtypePickSchema).min(1).max(3).optional(),
   influences: tags.optional(),
   favorites: z.array(z.string().trim().min(1).max(160)).max(4).optional(),
   performanceFee: money.nullable().optional(),

@@ -6,18 +6,17 @@ import { StarRating } from "@/components/common/star-rating";
 import { getInitials } from "@/lib/utils";
 import type { MusicianProfile } from "@/types";
 import { ProfileArtwork } from "@/components/artists/profile-artwork";
-import { CREATIVE_CATEGORIES } from "@/config";
 import { formatMoney } from "@/lib/marketplace-fees";
 import { SpotifyPlayer } from "@/components/artists/spotify-player";
 import { spotifyEmbedUrl } from "@/lib/spotify-embed";
 
 interface ArtistCardProps {
-  artist: MusicianProfile;
+  artist: MusicianProfile & { rateMatch?: { deltaPercent: number; direction: "above" | "below" } };
   blindScout?: boolean;
 }
 
 export function ArtistCard({ artist, blindScout = false }: ArtistCardProps) {
-  const category = CREATIVE_CATEGORIES.find((item) => item.slug === artist.primaryCategory)?.name ?? "Creative";
+  const category = artist.categoryPicks[0]?.groupName ?? "Creative";
   const spotifyAlbum = artist.discography.find((album) => album.source === "spotify" && spotifyEmbedUrl(album.externalUrl));
   return (
     <article className="group min-w-0 h-full rounded-2xl">
@@ -52,19 +51,28 @@ export function ArtistCard({ artist, blindScout = false }: ArtistCardProps) {
             {artist.experienceYears > 0 && <span>{artist.experienceYears} years of experience</span>}
           </div>
           <p className="mt-4 line-clamp-2 text-sm leading-6 text-muted">{artist.bio || "A new creative connection waiting to happen. Get to know their work."}</p>
-          {artist.performanceFee != null && <p className="mt-3 text-xs font-semibold text-brand">From {formatMoney(artist.performanceFee)} / performance</p>}
+          {artist.performanceFee != null && (
+            <p className="mt-3 text-xs font-semibold text-brand">
+              From {formatMoney(artist.performanceFee)} / performance
+              {artist.rateMatch && (
+                <span className="ml-2 font-normal text-amber-700">
+                  {artist.rateMatch.deltaPercent}% {artist.rateMatch.direction} your budget
+                </span>
+              )}
+            </p>
+          )}
           {blindScout && <div className="relative z-10 mt-4">{spotifyAlbum ? <SpotifyPlayer url={spotifyAlbum.externalUrl} title={spotifyAlbum.title} compact /> : <p className="rounded-xl bg-page/40 p-3 text-xs leading-5 text-muted">No Spotify release linked yet. Explore their profile and creative influences.</p>}</div>}
 
           {/* Genre tags */}
           <div className="mt-4 mb-5 flex flex-wrap gap-1.5">
-            {artist.genres.slice(0, 3).map((genre) => (
-              <Badge key={genre.id} variant="secondary" className="text-[10px]">
-                {genre.name}
+            {artist.genrePicks.slice(0, 3).map((pick) => (
+              <Badge key={pick.subtypeId} variant="secondary" className="text-[10px]">
+                {pick.customLabel ?? pick.subtypeName}
               </Badge>
             ))}
-            {artist.genres.length > 3 && (
+            {artist.genrePicks.length > 3 && (
               <Badge variant="outline" className="text-[10px]">
-                +{artist.genres.length - 3}
+                +{artist.genrePicks.length - 3}
               </Badge>
             )}
           </div>

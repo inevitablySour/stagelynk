@@ -6,8 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArtistCard } from "@/components/artists/artist-card";
-import { GENRES, CREATIVE_CATEGORIES } from "@/config";
+import { HierarchicalPicker } from "@/components/common/hierarchical-picker";
+import { GENRE_GROUPS, CATEGORY_GROUPS } from "@/config";
 import type { MusicianProfile } from "@/types";
+
+const GENRE_PICKER_GROUPS = GENRE_GROUPS.map((g) => ({
+  id: g.slug, name: g.name, children: g.subgenres.map((s) => ({ id: s.slug, name: s.name })),
+}));
+const CATEGORY_PICKER_GROUPS = CATEGORY_GROUPS.map((g) => ({
+  id: g.slug, name: g.name, children: g.subcategories.map((s) => ({ id: s.slug, name: s.name })),
+}));
 
 interface ArtistDirectoryProps {
   artists: MusicianProfile[];
@@ -15,7 +23,9 @@ interface ArtistDirectoryProps {
 
 export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProps) {
   const [query, setQuery] = useState("");
+  const [selectedGenreGroups, setSelectedGenreGroups] = useState<string[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedCategoryGroups, setSelectedCategoryGroups] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [location, setLocation] = useState("");
   const [minRating, setMinRating] = useState("");
@@ -28,7 +38,6 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const [instrument, setInstrument] = useState("");
-  const [subgenre, setSubgenre] = useState("");
   const [maxFee, setMaxFee] = useState("");
   const [sortBy, setSortBy] = useState("rating");
   const [credentialType, setCredentialType] = useState("");
@@ -40,18 +49,40 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
     (minRating ? 1 : 0) +
     (experienceMin ? 1 : 0) +
     (hasCredentials ? 1 : 0) +
-    (availableOn ? 1 : 0) + (instrument ? 1 : 0) + (subgenre ? 1 : 0) + (maxFee ? 1 : 0) + (credentialType ? 1 : 0);
+    (availableOn ? 1 : 0) + (instrument ? 1 : 0) + (maxFee ? 1 : 0) + (credentialType ? 1 : 0);
 
+  const toggleGenreGroup = (groupId: string) => {
+    setSelectedGenreGroups((prev) => {
+      if (prev.includes(groupId)) {
+        const group = GENRE_PICKER_GROUPS.find((g) => g.id === groupId);
+        if (group) setSelectedGenres((cur) => cur.filter((id) => !group.children.some((c) => c.id === id)));
+        return prev.filter((g) => g !== groupId);
+      }
+      return [...prev, groupId];
+    });
+  };
   const toggleGenre = (slug: string) => {
     setSelectedGenres((prev) => (prev.includes(slug) ? prev.filter((g) => g !== slug) : [...prev, slug]));
   };
 
+  const toggleCategoryGroup = (groupId: string) => {
+    setSelectedCategoryGroups((prev) => {
+      if (prev.includes(groupId)) {
+        const group = CATEGORY_PICKER_GROUPS.find((g) => g.id === groupId);
+        if (group) setSelectedCategories((cur) => cur.filter((id) => !group.children.some((c) => c.id === id)));
+        return prev.filter((g) => g !== groupId);
+      }
+      return [...prev, groupId];
+    });
+  };
   const toggleCategory = (slug: string) => {
     setSelectedCategories((prev) => (prev.includes(slug) ? prev.filter((c) => c !== slug) : [...prev, slug]));
   };
 
   function clearAll() {
+    setSelectedGenreGroups([]);
     setSelectedGenres([]);
+    setSelectedCategoryGroups([]);
     setSelectedCategories([]);
     setLocation("");
     setMinRating("");
@@ -59,7 +90,6 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
     setHasCredentials(false);
     setAvailableOn("");
     setInstrument("");
-    setSubgenre("");
     setMaxFee("");
     setCredentialType("");
   }
@@ -76,9 +106,9 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
         hasCredentials,
         availableOn,
         blindScout,
-        instrument, subgenre, maxFee, sortBy, credentialType,
+        instrument, maxFee, sortBy, credentialType,
       }),
-    [query, selectedGenres, selectedCategories, location, minRating, experienceMin, hasCredentials, availableOn, blindScout, instrument, subgenre, maxFee, sortBy, credentialType]
+    [query, selectedGenres, selectedCategories, location, minRating, experienceMin, hasCredentials, availableOn, blindScout, instrument, maxFee, sortBy, credentialType]
   );
 
   useEffect(() => {
@@ -93,7 +123,6 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
     if (hasCredentials) params.set("hasCredentials", "true");
     if (availableOn) params.set("availableOn", availableOn);
     if (instrument) params.set("instrument", instrument);
-    if (subgenre) params.set("subgenre", subgenre);
     if (maxFee) params.set("maxFee", maxFee);
     if (credentialType) params.set("credentialType", credentialType);
     params.set("sortBy", blindScout ? "blind_scout" : sortBy);
@@ -173,44 +202,30 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
 
           <div>
             <p className="mb-2 text-xs font-medium text-stone-500">Genre</p>
-            <div className="flex flex-wrap gap-2">
-              {GENRES.map((genre) => (
-                <button
-                  key={genre.slug}
-                  aria-pressed={selectedGenres.includes(genre.slug)}
-                  onClick={() => toggleGenre(genre.slug)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                    selectedGenres.includes(genre.slug)
-                      ? "border-olive-500 bg-olive-100 text-olive-700"
-                      : "border-stone-200 text-stone-600 hover:border-stone-300"
-                  }`}
-                >
-                  {genre.name}
-                  {selectedGenres.includes(genre.slug) && <X className="ml-1 inline h-3 w-3" />}
-                </button>
-              ))}
-            </div>
+            <HierarchicalPicker
+              groups={GENRE_PICKER_GROUPS}
+              selectedGroupIds={selectedGenreGroups}
+              selectedChildIds={selectedGenres}
+              onGroupToggle={toggleGenreGroup}
+              onChildToggle={toggleGenre}
+              mode="filter"
+              groupLabel="Genre"
+              childLabel="Subgenre"
+            />
           </div>
 
           <div>
             <p className="mb-2 text-xs font-medium text-stone-500">Category / Role</p>
-            <div className="flex flex-wrap gap-2">
-              {CREATIVE_CATEGORIES.map((category) => (
-                <button
-                  key={category.slug}
-                  aria-pressed={selectedCategories.includes(category.slug)}
-                  onClick={() => toggleCategory(category.slug)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                    selectedCategories.includes(category.slug)
-                      ? "border-olive-500 bg-olive-100 text-olive-700"
-                      : "border-stone-200 text-stone-600 hover:border-stone-300"
-                  }`}
-                >
-                  {category.name}
-                  {selectedCategories.includes(category.slug) && <X className="ml-1 inline h-3 w-3" />}
-                </button>
-              ))}
-            </div>
+            <HierarchicalPicker
+              groups={CATEGORY_PICKER_GROUPS}
+              selectedGroupIds={selectedCategoryGroups}
+              selectedChildIds={selectedCategories}
+              onGroupToggle={toggleCategoryGroup}
+              onChildToggle={toggleCategory}
+              mode="filter"
+              groupLabel="Category"
+              childLabel="Role"
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -249,9 +264,8 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div><label htmlFor="artist-instrument" className="mb-2 block text-xs font-medium text-muted">Instrument</label><Input id="artist-instrument" value={instrument} onChange={(event) => setInstrument(event.target.value)} placeholder="e.g. guitar" /></div>
-            <div><label htmlFor="artist-subgenre" className="mb-2 block text-xs font-medium text-muted">Subgenre</label><Input id="artist-subgenre" value={subgenre} onChange={(event) => setSubgenre(event.target.value)} placeholder="e.g. dream pop" /></div>
             <div><label htmlFor="artist-max-fee" className="mb-2 block text-xs font-medium text-muted">Max performance fee (EUR)</label><Input id="artist-max-fee" type="number" min={0} value={maxFee} onChange={(event) => setMaxFee(event.target.value)} placeholder="e.g. 500" /></div>
           </div>
           <label className="flex items-center gap-2 text-sm text-stone-600">

@@ -13,7 +13,6 @@ import { auth } from "@/lib/auth";
 import { serializeMusicianProfile } from "@/lib/serializers";
 import { BookingRequestCard } from "@/components/artists/booking-request-card";
 import { ProfileArtwork } from "@/components/artists/profile-artwork";
-import { CREATIVE_CATEGORIES } from "@/config";
 import type { SocialLinks } from "@/types";
 import { formatMoney } from "@/lib/marketplace-fees";
 import { PortfolioRelease } from "@/components/artists/portfolio-release";
@@ -24,7 +23,9 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
   const profile = await prisma.musicianProfile.findUnique({
     where: { id, user: { deletedAt: null } },
     include: {
-      genres: { include: { genre: true } },
+      mainGenreGroup: true,
+      genrePicks: { include: { subtype: true } },
+      categoryPicks: { include: { subtype: { include: { group: true } }, instrumentType: true } },
       services: { include: { service: true } },
       albums: { include: { tracks: true } },
       credentials: true,
@@ -50,7 +51,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
   });
 
   const socialLinks = (artist.socialLinks ?? {}) as SocialLinks;
-  const category = CREATIVE_CATEGORIES.find((item) => item.slug === artist.primaryCategory)?.name ?? "Creative";
+  const category = artist.categoryPicks[0]?.groupName ?? "Creative";
   const upcomingAvailability = artist.availability;
   const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   const links = Object.entries(socialLinks).filter((entry): entry is [string, string] => Boolean(entry[1]));
@@ -84,8 +85,22 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                     <span className="inline-flex items-center gap-1.5"><Star className="h-4 w-4" />{artist.reviewCount > 0 ? `${artist.weightedRating}/10 weighted · ${artist.reviewCount} reviews` : "New here · discover their work"}</span>
                   </div>
                   <div className="mt-5 flex flex-wrap gap-2">
-                    {artist.genres.map((genre) => <Badge key={genre.id} variant="secondary" className="px-3 py-1">{genre.name}</Badge>)}
+                    {artist.mainGenreGroup && <Badge variant="secondary" className="px-3 py-1">{artist.mainGenreGroup.name}</Badge>}
+                    {artist.genrePicks.map((pick) => (
+                      <Badge key={pick.subtypeId} variant="outline" className="px-3 py-1">
+                        {pick.customLabel ?? pick.subtypeName}
+                      </Badge>
+                    ))}
                   </div>
+                  {artist.categoryPicks.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {artist.categoryPicks.map((pick) => (
+                        <Badge key={pick.subtypeId + (pick.instrumentTypeSlug ?? "")} variant="secondary" className="px-3 py-1">
+                          {pick.instrumentTypeName ?? pick.subtypeName}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   {artist.services.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {artist.services.map((service) => <Badge key={service.id} variant="outline" className="px-3 py-1">{service.name}</Badge>)}
@@ -117,7 +132,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                       <div className="flex flex-wrap gap-2">{artist.instruments.map((instrument) => <Badge key={instrument} variant="outline" className="px-3 py-1">{instrument}</Badge>)}</div>
                     </div>
                   )}
-                  {(artist.subgenres?.length || artist.influences?.length || artist.favorites?.length) ? <div className="mt-6 grid gap-5 border-t border-line pt-5 sm:grid-cols-2">{[["Subgenres", artist.subgenres], ["Influences", artist.influences], ["Four favorites", artist.favorites]].map(([title, values]) => Array.isArray(values) && values.length > 0 ? <div key={String(title)}><h3 className="mb-2 text-sm font-semibold text-ink">{String(title)}</h3><p className="text-sm leading-6 text-muted">{values.join(" · ")}</p></div> : null)}</div> : null}
+                  {(artist.influences?.length || artist.favorites?.length) ? <div className="mt-6 grid gap-5 border-t border-line pt-5 sm:grid-cols-2">{[["Influences", artist.influences], ["Four favorites", artist.favorites]].map(([title, values]) => Array.isArray(values) && values.length > 0 ? <div key={String(title)}><h3 className="mb-2 text-sm font-semibold text-ink">{String(title)}</h3><p className="text-sm leading-6 text-muted">{values.join(" · ")}</p></div> : null)}</div> : null}
                 </CardContent>
               </Card>
 
