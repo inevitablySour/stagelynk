@@ -13,7 +13,7 @@ export async function GET() {
 
   const profile = await prisma.musicianProfile.findUnique({
     where: { userId: session.user.id },
-    include: { genres: { include: { genre: true } } },
+    include: { genres: { include: { genre: true } }, services: { include: { service: true } } },
   });
 
   if (!profile) {
@@ -25,6 +25,7 @@ export async function GET() {
     data: {
       ...profile,
       genres: profile.genres.map((mg) => mg.genre),
+      services: profile.services.map((ms) => ms.service),
     },
   });
 }
@@ -45,7 +46,7 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const { genres: genreSlugs, ...profileFields } = parsed.data;
+  const { genres: genreSlugs, services: serviceSlugs, ...profileFields } = parsed.data;
 
   const existing = await prisma.musicianProfile.findFirst({ where: { userId: session.user.id, user: { deletedAt: null } } });
   if (!existing) {
@@ -73,8 +74,25 @@ export async function PATCH(request: Request) {
             },
           }
         : {}),
+      ...(serviceSlugs
+        ? {
+            services: {
+              deleteMany: {},
+              create: await Promise.all(
+                serviceSlugs.map(async (slug) => {
+                  const service = await prisma.service.upsert({
+                    where: { slug },
+                    update: {},
+                    create: { slug, name: slug },
+                  });
+                  return { serviceId: service.id };
+                })
+              ),
+            },
+          }
+        : {}),
     },
-    include: { genres: { include: { genre: true } } },
+    include: { genres: { include: { genre: true } }, services: { include: { service: true } } },
   });
 
   const requestMetadata = await getRequestMetadata();
@@ -96,6 +114,7 @@ export async function PATCH(request: Request) {
     data: {
       ...profile,
       genres: profile.genres.map((mg) => mg.genre),
+      services: profile.services.map((ms) => ms.service),
     },
   });
 }

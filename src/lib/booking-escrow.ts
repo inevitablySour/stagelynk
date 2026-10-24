@@ -43,3 +43,17 @@ export async function releaseHold(paymentIntentId: string) {
 export async function captureHold(paymentIntentId: string) {
   return stripe.paymentIntents.capture(paymentIntentId);
 }
+
+/**
+ * Refunds a captured charge, full or partial, as part of dispute resolution.
+ * Safe whether or not a transfer has already been made to the musician's
+ * connected account — Stripe allows refunding the original charge
+ * regardless, drawing the refund from the platform's own balance per the
+ * separate-charges-and-transfers model. See .claude/skills/stripe-connect/SKILL.md.
+ */
+export async function refundCharge(paymentIntentId: string, amount?: number) {
+  return stripe.refunds.create({
+    payment_intent: paymentIntentId,
+    ...(amount !== undefined ? { amount: toMinorUnits(amount) } : {}),
+  });
+}

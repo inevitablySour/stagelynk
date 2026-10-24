@@ -14,7 +14,15 @@ interface PaymentMethod {
   expYear?: number;
 }
 
-export function PaymentMethodsManager() {
+interface PaymentMethodsManagerProps {
+  endpoint?: string;
+  description?: string;
+}
+
+export function PaymentMethodsManager({
+  endpoint = "/api/venues/me/payment-methods",
+  description = "Used to charge Direct Hire bookings and accepted Open Call applications.",
+}: PaymentMethodsManagerProps) {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [defaultId, setDefaultId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +33,7 @@ export function PaymentMethodsManager() {
   async function loadMethods() {
     setLoading(true);
     try {
-      const res = await fetch("/api/venues/me/payment-methods");
+      const res = await fetch(endpoint);
       const json = await res.json();
       if (json.success) {
         setMethods(json.data.paymentMethods);
@@ -38,7 +46,8 @@ export function PaymentMethodsManager() {
 
   useEffect(() => {
     Promise.resolve().then(() => loadMethods());
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpoint]);
 
   async function startAdding() {
     setError(null);
@@ -53,7 +62,7 @@ export function PaymentMethodsManager() {
   }
 
   async function handleConfirmed(paymentMethodId: string) {
-    await fetch("/api/venues/me/payment-methods", {
+    await fetch(endpoint, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paymentMethodId }),
@@ -64,7 +73,7 @@ export function PaymentMethodsManager() {
   }
 
   async function makeDefault(paymentMethodId: string) {
-    await fetch("/api/venues/me/payment-methods", {
+    await fetch(endpoint, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paymentMethodId }),
@@ -76,7 +85,7 @@ export function PaymentMethodsManager() {
     <Card className="mt-6">
       <CardHeader>
         <CardTitle>Saved cards</CardTitle>
-        <CardDescription>Used to charge Direct Hire bookings and accepted Open Call applications.</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

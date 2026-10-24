@@ -52,6 +52,7 @@ enum NegotiationStatus {
 enum BookingSource {
   direct_request
   job_application
+  project_application
   manual
 }
 
@@ -201,6 +202,7 @@ model User {
   sessions        Session[]
   reviews         Review[]
   auditLogs       AuditLog[] @relation("ActorAuditLogs")
+  notificationPreference NotificationPreference?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -208,6 +210,21 @@ model User {
   @@index([role])
   @@index([createdAt])
   @@index([deletedAt])
+}
+
+model NotificationPreference {
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  bookingRequests      Boolean @default(true)
+  bookingUpdates       Boolean @default(true)
+  newReviews           Boolean @default(true)
+  jobAlerts            Boolean @default(true)
+  marketingEmails      Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Account {
@@ -280,21 +297,29 @@ model MusicianProfile {
   stripeConnectAccountId  String?  @unique
   stripeOnboardingComplete Boolean @default(false)
   stripePayoutsEnabled    Boolean  @default(false)
+  stripeCustomerId        String?  @unique
 
   primaryCategory String  @default("musician")
 
   user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   genres     MusicianGenre[]
   categories TalentCategory[]
+  services   MusicianService[]
   albums     Album[]
   bookings   Booking[]
   reviews    Review[]
   jobApplications JobApplication[]
+  projectApplications ProjectApplication[]
   payouts    Payout[]
   equipmentNeeds MusicianEquipmentNeed[]
   equipmentOwned MusicianEquipmentOwned[]
   credentials Credential[]
   availabilitySlots AvailabilitySlot[]
+  conversationParticipants ConversationParticipant[]
+  sentMessages             Message[]
+  p2pQuestionnaireResponse P2PQuestionnaireResponse?
+  p2pMatchesAsA            P2PMatch[] @relation("P2PMatchA")
+  p2pMatchesAsB            P2PMatch[] @relation("P2PMatchB")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -329,6 +354,7 @@ model Album {
 
   musician MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
   tracks   Track[]
+  linkedServices MusicianService[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -370,6 +396,7 @@ model VenueProfile {
   membershipTier MembershipTier? @relation(fields: [membershipTierId], references: [id])
   bookings       Booking[]
   jobListings    JobListing[]
+  projectListings ProjectListing[]
   promotionCampaigns PromotionCampaign[]
   equipmentOfferings VenueEquipmentOffering[]
 
@@ -387,11 +414,17 @@ model Booking {
   musicianId         String
   venueId            String
   jobApplicationId   String?       @unique
+  projectApplicationId String?     @unique
   title              String        @default("Gig booking")
   eventType          String        @default("Live performance")
   eventDate          DateTime
   startTime          String
   endTime            String
+  // Set only for project_application-sourced bookings — a deliverable due
+  // date, not an in-person event time. eventDate/startTime/endTime still get
+  // populated (deadline date, "00:00") so existing booking-list queries that
+  // assume those fields are always set keep working unchanged.
+  dueDate            DateTime?
   venueAddress       String        @default("")
   audienceSize       Int?
   loadInTime         String?
@@ -434,6 +467,7 @@ model Booking {
   musician       MusicianProfile          @relation(fields: [musicianId], references: [id])
   venue          VenueProfile             @relation(fields: [venueId], references: [id])
   jobApplication JobApplication?          @relation(fields: [jobApplicationId], references: [id], onDelete: SetNull)
+  projectApplication ProjectApplication?  @relation(fields: [projectApplicationId], references: [id], onDelete: SetNull)
   transactions   MarketplaceTransaction[]
   disputes       BookingDispute[]
   review         Review?
@@ -524,6 +558,7 @@ model JobListing {
   location              String           @default("")
   budgetMin             Float            @default(0)
   budgetMax             Float            @default(0)
+  hideBudget            Boolean          @default(false)
   currency              String           @default("EUR")
   categories            Json             @default("[]")
   genres                Json             @default("[]")
@@ -558,6 +593,8 @@ model JobListingSlot {
   reservedByApplicationId String? @unique
   budgetMin    Float?
   budgetMax    Float?
+  startTime    String?
+  endTime      String?
 
   jobListing  JobListing       @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
   applications JobApplication[]
@@ -593,6 +630,59 @@ model JobApplication {
   @@index([status])
   @@index([createdAt])
   @@index([slotId])
+}
+
+// Deliverable-based work (a soundtrack, a video edit, a mix) — deadline
+// instead of an event date/time, remote-friendly (no venue address
+// required), single hire rather than a multi-slot lineup. Deliberately a
+// separate model from JobListing/JobApplication rather than an "event vs
+// project" mode on the same model, so each stays simpler and the event-only
+// fields (startTime/endTime/venueAddress/slots) never need to be optional.
+model ProjectListing {
+  id                String               @id @default(cuid())
+  venueId           String
+  title             String
+  description       String               @default("") @db.Text
+  deadline          DateTime?
+  budgetMin         Float                @default(0)
+  budgetMax         Float                @default(0)
+  hideBudget        Boolean              @default(false)
+  currency          String               @default("EUR")
+  categories        Json                 @default("[]")
+  genres            Json                 @default("[]")
+  requiredServices  Json                 @default("[]")
+  status            JobListingStatus     @default(draft)
+
+  venue        VenueProfile         @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  applications ProjectApplication[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([venueId])
+  @@index([status])
+  @@index([deadline])
+}
+
+model ProjectApplication {
+  id           String               @id @default(cuid())
+  projectListingId String
+  musicianId   String
+  coverMessage String               @default("") @db.Text
+  proposedFee  Float?
+  status       JobApplicationStatus @default(submitted)
+
+  projectListing ProjectListing  @relation(fields: [projectListingId], references: [id], onDelete: Cascade)
+  musician       MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  booking        Booking?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectListingId, musicianId])
+  @@index([musicianId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model MarketplaceTransaction {
@@ -749,6 +839,36 @@ model TalentCategory {
   @@index([categoryId])
 }
 
+// Services a creative offers (session recording, mixing, filming, lessons,
+// etc.) — distinct from genre/style and from CreativeCategory ("what kind of
+// creative they are"). Applies to every profile type on MusicianProfile
+// (musicians, DJs, voice actors, videographers, sound engineers, and so on).
+model Service {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+  icon String @default("")
+
+  musicians MusicianService[]
+
+  @@index([slug])
+}
+
+model MusicianService {
+  id         String  @id @default(cuid())
+  musicianId String
+  serviceId  String
+  portfolioAlbumId String?
+
+  musician       MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  service        Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  portfolioAlbum Album?          @relation(fields: [portfolioAlbumId], references: [id], onDelete: SetNull)
+
+  @@unique([musicianId, serviceId])
+  @@index([serviceId])
+  @@index([portfolioAlbumId])
+}
+
 model EquipmentItem {
   id       String @id @default(cuid())
   name     String @unique
@@ -847,4 +967,160 @@ model AuditLog {
   @@index([requestId])
   @@index([occurredAt])
   @@index([expiresAt])
+}
+
+// ── P2P chat substrate (Phase 1) ─────────────────────────────
+enum ConversationKind {
+  p2p_match
+}
+
+model Conversation {
+  id            String           @id @default(cuid())
+  kind          ConversationKind @default(p2p_match)
+  lastMessageAt DateTime?
+
+  participants ConversationParticipant[]
+  messages     Message[]
+  match        P2PMatch?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lastMessageAt])
+}
+
+model ConversationParticipant {
+  id             String    @id @default(cuid())
+  conversationId String
+  musicianId     String
+  lastReadAt     DateTime?
+
+  conversation Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  musician     MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([conversationId, musicianId])
+  @@index([musicianId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String   @db.Text
+  createdAt      DateTime @default(now())
+
+  conversation Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       MusicianProfile @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+// ── P2P Collaboration system (Phase 3) ───────────────────────
+model P2PQuestionnaireResponse {
+  id          String    @id @default(cuid())
+  musicianId  String    @unique
+  answers     Json      @default("{}")
+  completedAt DateTime?
+
+  musician MusicianProfile @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum P2PMatchStatus {
+  pending
+  mutual
+  declined
+}
+
+model P2PMatch {
+  id             String         @id @default(cuid())
+  musicianAId    String
+  musicianBId    String
+  initiatedBy    String
+  status         P2PMatchStatus @default(pending)
+  respondedAt    DateTime?
+  conversationId String?        @unique
+
+  musicianA    MusicianProfile @relation("P2PMatchA", fields: [musicianAId], references: [id], onDelete: Cascade)
+  musicianB    MusicianProfile @relation("P2PMatchB", fields: [musicianBId], references: [id], onDelete: Cascade)
+  conversation Conversation?   @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  deals        P2PDeal[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([musicianAId, musicianBId])
+  @@index([musicianBId])
+  @@index([status])
+}
+
+enum P2PDealType {
+  flat_fee
+  milestone
+  split_50_50
+}
+
+enum P2PDealStatus {
+  proposed
+  accepted
+  declined
+  in_progress
+  completed
+  cancelled
+}
+
+model P2PDeal {
+  id          String        @id @default(cuid())
+  matchId     String
+  proposedBy  String
+  payerId     String?
+  payeeId     String?
+  dealType    P2PDealType
+  status      P2PDealStatus @default(proposed)
+  title       String
+  description String        @default("") @db.Text
+  rateBasis   String?
+  rateAmount  Float?
+  currency    String        @default("EUR")
+
+  stripePaymentIntentId String?
+  stripeTransferId      String?
+  paidAt                DateTime?
+
+  match      P2PMatch       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  milestones P2PMilestone[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([matchId])
+  @@index([status])
+}
+
+enum P2PMilestoneStatus {
+  pending
+  submitted
+  approved
+  paid
+}
+
+model P2PMilestone {
+  id          String             @id @default(cuid())
+  dealId      String
+  label       String
+  amount      Float
+  order       Int                @default(0)
+  status      P2PMilestoneStatus @default(pending)
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  paidAt      DateTime?
+
+  deal P2PDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
 }

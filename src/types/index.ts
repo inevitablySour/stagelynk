@@ -17,6 +17,7 @@ export interface MusicianProfile {
   stageName: string;
   bio: string;
   genres: Genre[];
+  services: Genre[];
   experienceYears: number;
   location: string;
   profileImage?: string;

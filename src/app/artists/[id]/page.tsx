@@ -25,6 +25,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
     where: { id, user: { deletedAt: null } },
     include: {
       genres: { include: { genre: true } },
+      services: { include: { service: true } },
       albums: { include: { tracks: true } },
       credentials: true,
       availabilitySlots: {
@@ -85,6 +86,11 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                   <div className="mt-5 flex flex-wrap gap-2">
                     {artist.genres.map((genre) => <Badge key={genre.id} variant="secondary" className="px-3 py-1">{genre.name}</Badge>)}
                   </div>
+                  {artist.services.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {artist.services.map((service) => <Badge key={service.id} variant="outline" className="px-3 py-1">{service.name}</Badge>)}
+                    </div>
+                  )}
                 </div>
                 <div className="flex shrink-0 flex-col gap-2 lg:pt-5">
                   <Button size="lg" asChild><Link href={viewer?.isOwner ? (viewer.role === "venue" ? "/venue/profile" : "/musician/profile") : "#book"}>{viewer?.isOwner ? "Manage your profile" : viewer && viewer.role !== "venue" ? "Booking information" : "Request a booking"}<ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button>

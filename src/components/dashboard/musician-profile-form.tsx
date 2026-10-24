@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { GENRES } from "@/config";
+import { GENRES, SERVICES } from "@/config";
 
 interface MusicianProfileFormProps {
   initial: {
@@ -16,6 +16,7 @@ interface MusicianProfileFormProps {
     location: string;
     experienceYears: number;
     genreSlugs: string[];
+    serviceSlugs: string[];
     instruments: string[];
   };
 }
@@ -27,6 +28,7 @@ export function MusicianProfileForm({ initial }: MusicianProfileFormProps) {
   const [bio, setBio] = useState(initial.bio);
   const [experienceYears, setExperienceYears] = useState(initial.experienceYears);
   const [genreSlugs, setGenreSlugs] = useState<string[]>(initial.genreSlugs);
+  const [serviceSlugs, setServiceSlugs] = useState<string[]>(initial.serviceSlugs);
   const [instruments, setInstruments] = useState<string[]>(initial.instruments);
   const [instrumentInput, setInstrumentInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -34,6 +36,10 @@ export function MusicianProfileForm({ initial }: MusicianProfileFormProps) {
 
   const toggleGenre = (slug: string) => {
     setGenreSlugs((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
+  };
+
+  const toggleService = (slug: string) => {
+    setServiceSlugs((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
   };
 
   function addInstrument() {
@@ -61,6 +67,7 @@ export function MusicianProfileForm({ initial }: MusicianProfileFormProps) {
           bio,
           experienceYears: Number(experienceYears) || 0,
           genres: genreSlugs,
+          services: serviceSlugs,
           instruments,
         }),
       });
@@ -120,6 +127,17 @@ export function MusicianProfileForm({ initial }: MusicianProfileFormProps) {
             {GENRES.map((genre) => (
               <button key={genre.slug} type="button" onClick={() => toggleGenre(genre.slug)}>
                 <Badge variant={genreSlugs.includes(genre.slug) ? "default" : "outline"}>{genre.name}</Badge>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium">Services you offer</label>
+          <p className="mb-2 text-xs text-stone-500">What clients can book you for — separate from your genre or creative category.</p>
+          <div className="flex flex-wrap gap-2">
+            {SERVICES.map((service) => (
+              <button key={service.slug} type="button" onClick={() => toggleService(service.slug)}>
+                <Badge variant={serviceSlugs.includes(service.slug) ? "default" : "outline"}>{service.name}</Badge>
               </button>
             ))}
           </div>

@@ -42,6 +42,18 @@ export async function releasePayoutForBooking(
     throw new PayoutReleaseError("The musician hasn't finished setting up their payout account yet.");
   }
 
+  const openDispute = await prisma.bookingDispute.findFirst({
+    where: {
+      bookingId: booking.id,
+      status: {
+        notIn: ["resolved_refund_full", "resolved_refund_partial", "resolved_no_refund"],
+      },
+    },
+  });
+  if (openDispute) {
+    throw new PayoutReleaseError("This booking has an open dispute and cannot be paid out yet.");
+  }
+
   const paymentIntent = await stripe.paymentIntents.retrieve(booking.stripePaymentIntentId);
   const chargeId =
     typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : paymentIntent.latest_charge?.id;

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard, User, Music, Calendar, Star, Settings, Search, Crown,
-  Briefcase, FileText, Megaphone, LogOut, Menu, X, Wallet,
+  Briefcase, FileText, Megaphone, LogOut, Menu, X, Wallet, MessageCircle, Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ import type { UserRole } from "@/types";
 
 const iconMap: Record<string, React.ElementType> = {
   LayoutDashboard, User, Music, Calendar, Star, Settings, Search, Crown,
-  Briefcase, FileText, Megaphone, Wallet,
+  Briefcase, FileText, Megaphone, Wallet, MessageCircle, Users,
 };
 
 interface SidebarProps {

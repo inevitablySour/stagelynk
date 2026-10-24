@@ -16,6 +16,7 @@ export async function discoverArtists(filters: z.infer<typeof discoveryQuerySche
     },
     include: {
       genres: { include: { genre: true } },
+      services: { include: { service: true } },
       albums: { include: { tracks: true } },
       credentials: true,
       availabilitySlots: true,

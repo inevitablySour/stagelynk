@@ -5,6 +5,7 @@ import { computeWeightedRating } from "@/lib/rating";
 type MusicianWithRelations = Prisma.MusicianProfileGetPayload<{
   include: {
     genres: { include: { genre: true } };
+    services: { include: { service: true } };
     albums: { include: { tracks: true } };
     credentials?: true;
     availabilitySlots?: true;
@@ -18,6 +19,7 @@ export function serializeMusicianProfile(profile: MusicianWithRelations): Musici
     stageName: profile.stageName,
     bio: profile.bio,
     genres: profile.genres.map((mg) => mg.genre),
+    services: profile.services.map((ms) => ms.service),
     experienceYears: profile.experienceYears,
     location: profile.location,
     profileImage: profile.profileImage ?? undefined,

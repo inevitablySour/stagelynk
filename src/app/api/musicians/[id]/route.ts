@@ -9,6 +9,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     where: { id, user: { deletedAt: null } },
     include: {
       genres: { include: { genre: true } },
+      services: { include: { service: true } },
       albums: { include: { tracks: true } },
       credentials: true,
       availabilitySlots: true,

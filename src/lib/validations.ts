@@ -4,6 +4,7 @@ import { calendarDate, normalizeCategory, normalizeTags } from "@/lib/discovery-
 const money = z.number().finite().min(0).max(1000000).multipleOf(0.01);
 const tags = z.array(z.string().trim().min(1).max(80)).max(20).transform(normalizeTags);
 const optionalUrl = z.union([z.url().refine((value) => /^https?:\/\//i.test(value), "Use an HTTP(S) URL"), z.literal("")]).optional();
+const timeOfDay = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 
 export const loginSchema = z.object({
   email: z.email("Please enter a valid email address"),
@@ -15,8 +16,8 @@ export const jobListingSchema = z.object({
   description: z.string().trim().min(20, "Description must be at least 20 characters").max(5000),
   eventType: z.string().trim().min(2).max(80),
   eventDate: z.union([calendarDate, z.literal("")]).optional(),
-  startTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
-  endTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
+  startTime: timeOfDay.optional(),
+  endTime: timeOfDay.optional(),
   timeZone: z.string().max(80).refine((value) => {
     try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; }
   }, "Choose a valid IANA time zone").optional(),
@@ -30,6 +31,7 @@ export const jobListingSchema = z.object({
   location: z.string().max(120).optional(),
   budgetMin: money.optional(),
   budgetMax: money.optional(),
+  hideBudget: z.boolean().optional(),
   currency: z.literal("EUR").optional(),
   categories: tags.optional(),
   genres: tags.optional(),
@@ -42,8 +44,13 @@ export const jobListingSchema = z.object({
     label: z.string().trim().min(1).max(80),
     budgetMin: money.refine((value) => value > 0, "Slot fees must be positive").nullable().optional(),
     budgetMax: money.refine((value) => value > 0, "Slot fees must be positive").nullable().optional(),
+    startTime: timeOfDay.nullable().optional(),
+    endTime: timeOfDay.nullable().optional(),
   }).refine((slot) => (slot.budgetMin == null) === (slot.budgetMax == null)
-    && (slot.budgetMin == null || slot.budgetMax! >= slot.budgetMin), "Provide both slot budget limits in ascending order")).min(1).max(20).optional(),
+    && (slot.budgetMin == null || slot.budgetMax! >= slot.budgetMin), "Provide both slot budget limits in ascending order")
+    .refine((slot) => (slot.startTime == null) === (slot.endTime == null), "Provide both a start and end time, or neither")
+    .refine((slot) => slot.startTime == null || slot.startTime !== slot.endTime, "Slot start and end time cannot be identical"))
+    .min(1).max(20).optional(),
 });
 
 export const jobApplicationSchema = z.object({
@@ -92,6 +99,7 @@ export const musicianProfileSchema = z.object({
   experienceYears: z.number().min(0).max(100).optional(),
   location: z.string().optional(),
   genres: z.array(z.string()).optional(),
+  services: z.array(z.string()).optional(),
   socialLinks: socialLinksSchema.optional(),
   instruments: z.array(z.string().max(60)).max(20).optional(),
   primaryCategory: z.string().refine((value) => Boolean(normalizeCategory(value)), "Choose a creative category").transform((value) => normalizeCategory(value)!).optional(),
@@ -164,6 +172,27 @@ export type MusicianProfileInput = z.infer<typeof musicianProfileSchema>;
 export type VenueProfileInput = z.infer<typeof venueProfileSchema>;
 export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
 export type ReviewInput = z.infer<typeof reviewSchema>;
+export const projectListingSchema = z.object({
+  title: z.string().trim().min(4, "Project title must be at least 4 characters").max(140),
+  description: z.string().trim().min(20, "Description must be at least 20 characters").max(5000),
+  deadline: z.union([z.iso.datetime({ offset: true }), z.literal("")]).optional(),
+  budgetMin: money.optional(),
+  budgetMax: money.optional(),
+  hideBudget: z.boolean().optional(),
+  currency: z.literal("EUR").optional(),
+  categories: tags.optional(),
+  genres: tags.optional(),
+  requiredServices: z.array(z.string().trim().min(1).max(160)).max(30).optional(),
+  status: z.enum(["draft", "published", "paused", "closed", "filled", "expired"]).optional(),
+});
+
+export const projectApplicationSchema = z.object({
+  coverMessage: z.string().trim().max(2000).optional(),
+  proposedFee: money.optional(),
+});
+
 export type JobListingInput = z.infer<typeof jobListingSchema>;
+export type ProjectListingInput = z.infer<typeof projectListingSchema>;
+export type ProjectApplicationInput = z.infer<typeof projectApplicationSchema>;
 export type JobApplicationInput = z.infer<typeof jobApplicationSchema>;
 export type PromotionCampaignInput = z.infer<typeof promotionCampaignSchema>;

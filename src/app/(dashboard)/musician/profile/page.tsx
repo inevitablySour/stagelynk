@@ -19,6 +19,7 @@ export default async function MusicianProfilePage() {
     where: { userId: session.user.id },
     include: {
       genres: { include: { genre: true } },
+      services: { include: { service: true } },
       equipmentNeeds: true,
       equipmentOwned: true,
       credentials: true,
@@ -43,6 +44,7 @@ export default async function MusicianProfilePage() {
               location: profile.location,
               experienceYears: profile.experienceYears,
               genreSlugs: profile.genres.map((mg) => mg.genre.slug),
+              serviceSlugs: profile.services.map((ms) => ms.service.slug),
               instruments: profile.instruments,
             }}
           />

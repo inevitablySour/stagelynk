@@ -1,6 +1,6 @@
 import type { MembershipTier, Genre, EquipmentItem } from "@/types";
 
-export const APP_NAME = "StageLynk";
+export const APP_NAME = "IndieCentral";
 export const APP_TAGLINE = "Connecting creative talent with opportunity.";
 export const CURRENT_TERMS_VERSION = "2026-10-13";
 export const APP_DESCRIPTION =
@@ -17,9 +17,13 @@ export const DASHBOARD_NAV_MUSICIAN = [
   { label: "Overview", href: "/musician", icon: "LayoutDashboard" },
   { label: "Profile", href: "/musician/profile", icon: "User" },
   { label: "Portfolio", href: "/musician/discography", icon: "Music" },
+  { label: "Calendar", href: "/musician/calendar", icon: "Calendar" },
   { label: "Bookings", href: "/musician/bookings", icon: "Calendar" },
   { label: "Open Projects", href: "/musician/jobs", icon: "Briefcase" },
+  { label: "Deliverable Projects", href: "/musician/projects", icon: "FileText" },
   { label: "Applications", href: "/musician/applications", icon: "FileText" },
+  { label: "Collaborate", href: "/musician/p2p/discover", icon: "Users" },
+  { label: "Messages", href: "/musician/p2p/messages", icon: "MessageCircle" },
   { label: "Payouts", href: "/musician/payouts", icon: "Wallet" },
   { label: "Reviews", href: "/musician/reviews", icon: "Star" },
   { label: "Settings", href: "/settings", icon: "Settings" },
@@ -29,8 +33,10 @@ export const DASHBOARD_NAV_VENUE = [
   { label: "Overview", href: "/venue", icon: "LayoutDashboard" },
   { label: "Profile", href: "/venue/profile", icon: "User" },
   { label: "Find Talent", href: "/venue/search", icon: "Search" },
+  { label: "Calendar", href: "/venue/calendar", icon: "Calendar" },
   { label: "Bookings", href: "/venue/bookings", icon: "Calendar" },
   { label: "Job Listings", href: "/venue/jobs", icon: "Briefcase" },
+  { label: "Project Listings", href: "/venue/projects", icon: "FileText" },
   { label: "Payment Methods", href: "/venue/payment-methods", icon: "Wallet" },
   { label: "Promotions", href: "/venue/promotions", icon: "Megaphone" },
   { label: "Reviews", href: "/venue/reviews", icon: "Star" },
@@ -91,6 +97,82 @@ export const GENRES: Genre[] = [
   { id: "18", name: "Gospel", slug: "gospel" },
   { id: "19", name: "Punk", slug: "punk" },
   { id: "20", name: "Acoustic", slug: "acoustic" },
+];
+
+// ── Services ─────────────────────────────────────────────────
+// What a creative offers as a bookable service — distinct from genre/style
+// and from CREATIVE_CATEGORIES ("what kind of creative they are"). Applies
+// across every profile type (musicians, DJs, voice actors, videographers,
+// sound engineers, animators, photographers, etc.), not just musicians.
+// PLACEHOLDER — Valm's final content pending.
+export const SERVICES: Genre[] = [
+  { id: "s1", name: "Session Recording", slug: "session-recording" },
+  { id: "s2", name: "Live Sound Mixing", slug: "live-sound-mixing" },
+  { id: "s3", name: "Music Lessons", slug: "music-lessons" },
+  { id: "s4", name: "Video Editing", slug: "video-editing" },
+  { id: "s5", name: "Event Photography", slug: "event-photography" },
+];
+
+// ── P2P compatibility questionnaire ──────────────────────────
+// 7 questions, each skippable. Answers stored keyed by question id so
+// wording can change without a migration. PLACEHOLDER — wording open to
+// revision.
+export interface P2PQuestionnaireQuestion {
+  id: string;
+  prompt: string;
+  type: "single_choice" | "multi_choice" | "text";
+  options?: string[];
+  skippable: true;
+}
+
+export const P2P_QUESTIONNAIRE: P2PQuestionnaireQuestion[] = [
+  {
+    id: "q1",
+    prompt: "When collaborating, do you prefer to lead or support?",
+    type: "single_choice",
+    options: ["Lead", "Support", "Depends on the project"],
+    skippable: true,
+  },
+  {
+    id: "q2",
+    prompt: "What's your typical turnaround expectation for a collaboration?",
+    type: "single_choice",
+    options: ["Within days", "1-2 weeks", "A month or more", "Flexible"],
+    skippable: true,
+  },
+  {
+    id: "q3",
+    prompt: "How do you prefer to stay in touch during a project?",
+    type: "single_choice",
+    options: ["Daily check-ins", "Weekly updates", "Only when needed"],
+    skippable: true,
+  },
+  {
+    id: "q4",
+    prompt: "Which genres are you most interested in collaborating within?",
+    type: "multi_choice",
+    skippable: true,
+  },
+  {
+    id: "q5",
+    prompt: "Do you prefer remote or in-person collaboration?",
+    type: "single_choice",
+    options: ["Remote", "In-person", "Either works"],
+    skippable: true,
+  },
+  {
+    id: "q6",
+    prompt: "How much experience do you have collaborating with other creatives?",
+    type: "single_choice",
+    options: ["Just starting out", "Some experience", "Very experienced"],
+    skippable: true,
+  },
+  {
+    id: "q7",
+    prompt: "What are you hoping to get out of P2P collaboration?",
+    type: "text",
+    skippable: true,
+  },
 ];
 
 // ── Technical rider equipment catalog ───────────────────────
