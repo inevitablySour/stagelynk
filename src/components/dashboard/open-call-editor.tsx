@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { HierarchicalPicker } from "@/components/common/hierarchical-picker";
-import { EquipmentPicker } from "@/components/equipment/equipment-picker";
+import { EquipmentPickerDialog, EquipmentSummary } from "@/components/equipment/equipment-picker-dialog";
 import { GENRE_GROUPS } from "@/config";
 import type { OpenCallRow } from "@/lib/open-calls";
 import type { EquipmentItem } from "@/types";
@@ -25,6 +25,7 @@ export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { i
   const [useVenueEquipment, setUseVenueEquipment] = useState(initial?.useVenueEquipment ?? true);
   const [equipment, setEquipment] = useState(initial?.eventEquipment ?? []);
   const [catalog, setCatalog] = useState<EquipmentItem[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -107,7 +108,9 @@ export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { i
       {!useVenueEquipment && (
         <fieldset className="rounded-2xl border border-line p-4">
           <legend className="px-1 text-sm font-medium">Equipment at this event / external venue</legend>
-          <EquipmentPicker catalog={catalog} value={equipment} onChange={setEquipment} loading={catalog.length === 0 && !error} />
+          <EquipmentSummary catalog={catalog} value={equipment} loading={catalog.length === 0 && !error} onOpen={() => setPickerOpen(true)} emptyLabel="Add equipment" />
+          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setPickerOpen(true)} disabled={catalog.length === 0}>{equipment.length ? "Edit equipment" : "Add equipment"}</Button>
+          <EquipmentPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} title="Equipment at this event" catalog={catalog} value={equipment} onApply={(next) => { setEquipment(next); }} applyLabel="Apply" />
           <p className="mt-3 text-xs text-muted">An empty list explicitly means no equipment is provided.</p>
         </fieldset>
       )}
