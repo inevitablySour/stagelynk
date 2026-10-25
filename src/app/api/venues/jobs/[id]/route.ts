@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const instants = merged.status === "published" ? validateCallForPublishing(merged) : {};
       const ids = rest.eventEquipment?.map((item) => item.equipmentId) ?? [];
       const previous = Array.isArray(fresh.eventEquipment) ? (fresh.eventEquipment as { equipmentId: string }[]).map((item) => item.equipmentId) : [];
-      const invalidEquipment = await invalidEquipmentSelection(ids, { previouslySelected: previous, hardwareOnly: true });
+      const invalidEquipment = await invalidEquipmentSelection(ids, { previouslySelected: previous });
       if (invalidEquipment) throw new Error(invalidEquipment);
       const lineup = slots ?? (slotLabels ? slotLabels.map((label) => ({ label })) : undefined);
       return tx.jobListing.update({

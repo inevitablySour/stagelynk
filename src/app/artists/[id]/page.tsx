@@ -159,10 +159,10 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                   <p className="mb-5 text-sm leading-6 text-muted">Equipment this artist asks the venue to provide. Compatibility is checked when you start a booking.</p>
                   {profile.equipmentNeeds.length > 0 ? (
                     <ul className="divide-y divide-line rounded-xl border border-line px-4">
-                      {profile.equipmentNeeds.map((need) => <li key={need.id} className="flex items-start gap-4 py-4"><span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-brand-soft px-2 text-sm font-semibold text-brand">{need.quantity}×</span><div className="min-w-0"><p className="text-sm font-medium text-ink">{need.equipment.name}</p><p className="mt-1 break-words text-xs leading-5 text-muted">{need.notes || need.equipment.category}</p></div></li>)}
+                      {profile.equipmentNeeds.map((need) => <li key={need.id} className="flex items-start gap-4 py-4"><span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-brand-soft px-2 text-sm font-semibold text-brand">{need.equipment.kind === "software" ? "App" : `${need.quantity}×`}</span><div className="min-w-0"><p className="text-sm font-medium text-ink">{need.equipment.name}</p><p className="mt-1 break-words text-xs leading-5 text-muted">{need.notes || need.equipment.category}</p></div></li>)}
                     </ul>
                   ) : <p className="rounded-xl bg-page/50 p-4 text-sm leading-6 text-muted">No equipment requirements listed yet. Confirm the setup directly before booking.</p>}
-                  {profile.equipmentOwned.length > 0 && <div className="mt-6 border-t border-line pt-5"><h3 className="mb-3 text-sm font-semibold">Equipment the artist can bring</h3><ul className="space-y-2 text-sm text-muted">{profile.equipmentOwned.map((item) => <li key={item.id}>{item.quantity}× {item.equipment.name}</li>)}</ul></div>}
+                  {profile.equipmentOwned.length > 0 && <div className="mt-6 border-t border-line pt-5"><h3 className="mb-3 text-sm font-semibold">Equipment the artist can bring</h3><ul className="space-y-2 text-sm text-muted">{profile.equipmentOwned.map((item) => <li key={item.id}>{item.equipment.kind === "software" ? item.equipment.name : `${item.quantity}× ${item.equipment.name}`}</li>)}</ul></div>}
                 </CardContent>
               </Card>
 

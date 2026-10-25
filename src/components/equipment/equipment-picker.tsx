@@ -23,7 +23,6 @@ interface EquipmentPickerProps {
   catalog: EquipmentItem[];
   value: EquipmentSelection[];
   onChange: (next: EquipmentSelection[]) => void;
-  includeSoftware?: boolean;
   loading?: boolean;
 }
 
@@ -34,7 +33,7 @@ function normalize(value: string) {
   return value.toLocaleLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
 }
 
-export function EquipmentPicker({ catalog, value, onChange, includeSoftware = false, loading = false }: EquipmentPickerProps) {
+export function EquipmentPicker({ catalog, value, onChange, loading = false }: EquipmentPickerProps) {
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<string | null>(null);
   const [showSelected, setShowSelected] = useState(false);
@@ -44,8 +43,8 @@ export function EquipmentPicker({ catalog, value, onChange, includeSoftware = fa
 
   // Only active items are offered; hidden/retired ones appear only if already chosen.
   const offered = useMemo(
-    () => catalog.filter((item) => (item.status === "active" || selected.has(item.id)) && (includeSoftware || item.kind === "hardware")),
-    [catalog, selected, includeSoftware]
+    () => catalog.filter((item) => item.status === "active" || selected.has(item.id)),
+    [catalog, selected]
   );
 
   const groups = useMemo(
@@ -113,7 +112,7 @@ export function EquipmentPicker({ catalog, value, onChange, includeSoftware = fa
               setQuery(e.target.value);
               setShowSelected(false);
             }}
-            placeholder={loading ? "Loading catalog…" : `Search ${offered.length} items: ${includeSoftware ? "mixers, XLR cables, Ableton…" : "mixers, XLR cables, stage monitors…"}`}
+            placeholder={loading ? "Loading catalog…" : `Search ${offered.length} items: mixers, XLR cables, Ableton…`}
             disabled={loading}
             className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-10 text-sm shadow-sm transition-colors placeholder:text-muted/70 focus-visible:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           />

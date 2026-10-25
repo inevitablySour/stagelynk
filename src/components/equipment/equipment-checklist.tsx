@@ -20,14 +20,12 @@ interface EquipmentChecklistProps {
   mode: "needs" | "offerings";
   endpoint: string;
   initial: InitialEntry[];
-  /** Offer creative software too (e.g. "tools I bring"); riders and venues are hardware only. */
-  includeSoftware?: boolean;
 }
 
 const serialize = (entries: EquipmentSelection[]) =>
   JSON.stringify([...entries].sort((a, b) => a.equipmentId.localeCompare(b.equipmentId)).map((e) => [e.equipmentId, e.quantity]));
 
-export function EquipmentChecklist({ title, description, mode, endpoint, initial, includeSoftware = false }: EquipmentChecklistProps) {
+export function EquipmentChecklist({ title, description, mode, endpoint, initial }: EquipmentChecklistProps) {
   const [catalog, setCatalog] = useState<EquipmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selection, setSelection] = useState<EquipmentSelection[]>(initial.map(({ equipmentId, quantity }) => ({ equipmentId, quantity })));
@@ -82,7 +80,7 @@ export function EquipmentChecklist({ title, description, mode, endpoint, initial
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        <EquipmentPicker catalog={catalog} value={selection} onChange={(next) => { setSelection(next); setJustSaved(false); }} includeSoftware={includeSoftware} loading={loading} />
+        <EquipmentPicker catalog={catalog} value={selection} onChange={(next) => { setSelection(next); setJustSaved(false); }} loading={loading} />
       </CardContent>
       <div className="flex items-center justify-between gap-3 border-t border-line bg-surface-strong/50 px-6 py-3">
         <p className="flex items-center gap-2 text-sm" role="status">

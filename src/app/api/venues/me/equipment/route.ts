@@ -57,7 +57,6 @@ export async function PUT(request: Request) {
   const current = await prisma.venueEquipmentOffering.findMany({ where: { venueId: venue.id }, select: { equipmentId: true } });
   const invalid = await invalidEquipmentSelection(parsed.data.offerings.map((o) => o.equipmentId), {
     previouslySelected: current.map((c) => c.equipmentId),
-    hardwareOnly: true,
   });
   if (invalid) return NextResponse.json({ success: false, message: invalid }, { status: 400 });
 

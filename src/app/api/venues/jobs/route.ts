@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   try { if (status === "published") instants = validateCallForPublishing(schedule); }
   catch (error) { return NextResponse.json({ success: false, message: (error as Error).message }, { status: 400 }); }
   const equipmentIds = rest.eventEquipment?.map((item) => item.equipmentId) ?? [];
-  const invalidEquipment = await invalidEquipmentSelection(equipmentIds, { hardwareOnly: true });
+  const invalidEquipment = await invalidEquipmentSelection(equipmentIds);
   if (invalidEquipment) return NextResponse.json({ success: false, message: invalidEquipment }, { status: 400 });
   const lineup = slots ?? (slotLabels?.length ? slotLabels.map((label) => ({ label })) : [{ label: "Performance" }]);
 

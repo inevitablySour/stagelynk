@@ -66,7 +66,6 @@ export default async function MusicianProfilePage() {
             mode="offerings"
             endpoint="/api/musicians/me/equipment-owned"
             initial={profile.equipmentOwned.map((o) => ({ equipmentId: o.equipmentId, quantity: o.quantity, notes: o.notes }))}
-            includeSoftware
           />
 
           <CredentialsManager
