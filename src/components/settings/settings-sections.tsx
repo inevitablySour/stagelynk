@@ -26,7 +26,7 @@ export function SettingsSections({
   return (
     <div className="space-y-6">
       <AccountInfoForm name={name} email={email} location={location} />
-      <SecurityForm hasPassword={hasPassword} />
+      <SecurityForm hasPassword={hasPassword} email={email} />
 
       <Suspense fallback={null}>
         <ConnectedAccounts isGithubLinked={isGithubLinked} isGoogleLinked={isGoogleLinked} />

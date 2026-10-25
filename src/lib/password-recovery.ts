@@ -4,6 +4,9 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 
 const RESET_PREFIX = "password-reset:";
+// Lets a GitHub/Google-only account add a password. Kept distinct from reset
+// tokens: each kind is only redeemable for accounts in the matching state.
+const SETUP_PREFIX = "password-setup:";
 const RATE_PREFIX = "password-reset-rate:";
 export const passwordResetRequestSchema = z.object({ email: z.string().trim().max(254).pipe(z.email()).transform((value) => value.toLowerCase()) });
 export const passwordResetSchema = z.object({
@@ -50,29 +53,49 @@ export async function createPasswordReset(email: string, ip = "unknown", now = n
   return { user, token, tokenHash };
 }
 
+/** Emails a link that lets a signed-in, password-less (OAuth-only) account add a password. */
+export async function createPasswordSetup(userId: string, ip = "unknown", now = new Date()) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null, passwordHash: null },
+    select: { id: true, email: true, name: true },
+  });
+  if (!user) return { status: "not_eligible" as const };
+  if (!await allowResetRequest(user.email, ip, now)) return { status: "rate_limited" as const };
+  const token = randomBytes(32).toString("base64url");
+  await prisma.$transaction(async (tx) => {
+    await tx.verificationToken.deleteMany({ where: { identifier: `${SETUP_PREFIX}${user.id}` } });
+    await tx.verificationToken.create({ data: { identifier: `${SETUP_PREFIX}${user.id}`, token: hashResetToken(token), expires: resetTokenExpiry(now) } });
+  }, { isolationLevel: "Serializable" });
+  return { status: "sent" as const, user, token };
+}
+
+/** Redeems a reset or setup token. Returns the user and which kind was used, or null. */
 export async function consumePasswordReset(token: string, password: string, now = new Date()) {
   const tokenHash = hashResetToken(token);
   const reset = await prisma.verificationToken.findFirst({
-    where: { token: tokenHash, identifier: { startsWith: RESET_PREFIX }, expires: { gt: now } },
+    where: { token: tokenHash, OR: [{ identifier: { startsWith: RESET_PREFIX } }, { identifier: { startsWith: SETUP_PREFIX } }], expires: { gt: now } },
   });
   if (!reset) return null;
+  const isSetup = reset.identifier.startsWith(SETUP_PREFIX);
+  // A reset needs an existing password; a setup needs there to be none yet.
+  const passwordState = isSetup ? null : { not: null };
   const passwordHash = await hashPassword(password);
   return prisma.$transaction(async (tx) => {
     const consumed = await tx.verificationToken.deleteMany({ where: { identifier: reset.identifier, token: tokenHash, expires: { gt: new Date() } } });
     if (consumed.count !== 1) return null;
-    const userId = reset.identifier.slice(RESET_PREFIX.length);
+    const userId = reset.identifier.slice((isSetup ? SETUP_PREFIX : RESET_PREFIX).length);
     const user = await tx.user.findFirst({
-      where: { id: userId, deletedAt: null, passwordHash: { not: null } },
+      where: { id: userId, deletedAt: null, passwordHash: passwordState },
       select: { id: true, email: true, name: true },
     });
     if (!user) return null;
     const updated = await tx.user.updateMany({
-      where: { id: user.id, deletedAt: null, passwordHash: { not: null } },
+      where: { id: user.id, deletedAt: null, passwordHash: passwordState },
       data: { passwordHash, sessionVersion: { increment: 1 }, failedLoginCount: 0, lockedUntil: null },
     });
     if (updated.count !== 1) return null;
     await tx.session.deleteMany({ where: { userId: user.id } });
-    await tx.verificationToken.deleteMany({ where: { identifier: reset.identifier } });
-    return user;
+    await tx.verificationToken.deleteMany({ where: { identifier: { in: [`${RESET_PREFIX}${user.id}`, `${SETUP_PREFIX}${user.id}`] } } });
+    return { ...user, kind: isSetup ? ("setup" as const) : ("reset" as const) };
   });
 }

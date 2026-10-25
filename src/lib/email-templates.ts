@@ -37,6 +37,35 @@ export async function sendPasswordResetEmail(to: Recipient, token: string) {
   });
 }
 
+export async function sendPasswordSetupEmail(to: Recipient, token: string) {
+  const url = appUrl(`/reset-password?token=${encodeURIComponent(token)}&setup=1`);
+  await sendEmail({
+    from: { email: MAIL_FROM.accounts, name: `${APP_NAME} Accounts` },
+    to: [to],
+    subject: `Set a password for your ${APP_NAME} account`,
+    text: `Add a password to your account using this single-use link, valid for 30 minutes: ${url}\n\nYou can keep signing in with GitHub or Google too. If you didn't ask for this, ignore this email and nothing will change.`,
+    html: renderEmailHtml({
+      heading: "Set a password",
+      bodyHtml: `<p>You asked to add a password to your ${APP_NAME} account, so you can sign in with your email as well as GitHub or Google.</p><p>This link can be used once and expires in 30 minutes. If you didn't ask for this, ignore this email and nothing will change.</p>`,
+      button: { label: "Set my password", url },
+    }),
+  });
+}
+
+export async function sendPasswordAddedEmail(to: Recipient) {
+  await sendEmail({
+    from: { email: MAIL_FROM.accounts, name: `${APP_NAME} Accounts` },
+    to: [to],
+    subject: `A password was added to your ${APP_NAME} account`,
+    text: `A password was added to your account, and other sessions were signed out. If this wasn't you, contact ${MAIL_FROM.support} immediately.`,
+    html: renderEmailHtml({
+      heading: "Password added",
+      bodyHtml: `<p>You can now sign in with your email and password, as well as GitHub or Google. Other sessions were signed out.</p><p>If this wasn't you, contact ${MAIL_FROM.support} immediately.</p>`,
+      button: { label: "Contact support", url: appUrl("/contact") },
+    }),
+  });
+}
+
 export async function sendPasswordChangedEmail(to: Recipient) {
   await sendEmail({
     from: { email: MAIL_FROM.accounts, name: `${APP_NAME} Accounts` },

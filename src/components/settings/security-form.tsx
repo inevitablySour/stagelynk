@@ -1,12 +1,53 @@
 "use client";
 
 import { useState } from "react";
-import { Shield } from "lucide-react";
+import { CircleCheck, KeyRound, Mail, Shield } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export function SecurityForm({ hasPassword }: { hasPassword: boolean }) {
+function PasswordSetup({ email }: { email: string }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  async function sendLink() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/settings/security/password-setup", { method: "POST" });
+      const json = await res.json();
+      setResult({ ok: Boolean(json.success), message: json.message ?? "Unable to send the link right now." });
+    } catch {
+      setResult({ ok: false, message: "Unable to send the link right now." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 rounded-xl border border-line bg-surface-strong/50 p-4">
+        <KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+        <div className="text-sm">
+          <p className="font-medium text-ink">You sign in with GitHub or Google</p>
+          <p className="mt-1 text-muted">
+            Add a password to also sign in with <span className="font-medium text-ink">{email}</span>. For your security, we&apos;ll email you a link to set it, which confirms the request came from you. You can keep using GitHub or Google either way.
+          </p>
+        </div>
+      </div>
+      {result && (
+        <p role={result.ok ? "status" : "alert"} className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${result.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>
+          {result.ok ? <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" /> : null}{result.message}
+        </p>
+      )}
+      <Button type="button" onClick={sendLink} disabled={busy}>
+        <Mail className="h-4 w-4" /> {busy ? "Sending…" : result?.ok ? "Send another link" : "Email me a link to set a password"}
+      </Button>
+    </div>
+  );
+}
+
+export function SecurityForm({ hasPassword, email }: { hasPassword: boolean; email: string }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -64,9 +105,7 @@ export function SecurityForm({ hasPassword }: { hasPassword: boolean }) {
       </CardHeader>
       <CardContent>
         {!hasPassword ? (
-          <p className="text-sm text-stone-500">
-            This account signs in via Google or GitHub and has no password to change.
-          </p>
+          <PasswordSetup email={email} />
         ) : (
           <form className="space-y-4" onSubmit={submit}>
             <div>
