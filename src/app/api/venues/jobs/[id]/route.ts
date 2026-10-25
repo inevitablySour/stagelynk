@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { invalidEquipmentSelection } from "@/lib/equipment-catalog/selectable";
 import { jobListingSchema } from "@/lib/validations";
 import { writeAuditLog } from "@/lib/audit-log";
 import { getRequestMetadata } from "@/lib/request-context";
@@ -51,7 +52,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (merged.budgetMax < merged.budgetMin) throw new Error("Maximum budget cannot be below minimum budget.");
       const instants = merged.status === "published" ? validateCallForPublishing(merged) : {};
       const ids = rest.eventEquipment?.map((item) => item.equipmentId) ?? [];
-      if (ids.length && await tx.equipmentItem.count({ where: { id: { in: ids } } }) !== ids.length) throw new Error("Choose equipment from the catalog.");
+      const previous = Array.isArray(fresh.eventEquipment) ? (fresh.eventEquipment as { equipmentId: string }[]).map((item) => item.equipmentId) : [];
+      const invalidEquipment = await invalidEquipmentSelection(ids, { previouslySelected: previous, hardwareOnly: true });
+      if (invalidEquipment) throw new Error(invalidEquipment);
       const lineup = slots ?? (slotLabels ? slotLabels.map((label) => ({ label })) : undefined);
       return tx.jobListing.update({
         where: { id },

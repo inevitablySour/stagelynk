@@ -284,6 +284,9 @@ export interface EquipmentItem {
   name: string;
   slug: string;
   category: string;
+  group: string;
+  kind: "hardware" | "software";
+  status: "active" | "pending" | "rejected" | "hidden" | "retired";
 }
 
 export interface EquipmentRequirement {

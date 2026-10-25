@@ -1,16 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CircleCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { EquipmentPicker, type EquipmentSelection } from "@/components/equipment/equipment-picker";
 import type { EquipmentItem } from "@/types";
-
-interface SelectedEquipment {
-  equipmentId: string;
-  quantity: number;
-  notes: string;
-}
 
 interface InitialEntry {
   equipmentId: string;
@@ -21,137 +16,88 @@ interface InitialEntry {
 interface EquipmentChecklistProps {
   title: string;
   description: string;
-  /** "needs" shows "Artist must supply" framing, "offerings" shows "In-house" framing. */
+  /** Selects the request body key the endpoint expects. */
   mode: "needs" | "offerings";
   endpoint: string;
   initial: InitialEntry[];
+  /** Offer creative software too (e.g. "tools I bring"); riders and venues are hardware only. */
+  includeSoftware?: boolean;
 }
 
-export function EquipmentChecklist({ title, description, mode, endpoint, initial }: EquipmentChecklistProps) {
+const serialize = (entries: EquipmentSelection[]) =>
+  JSON.stringify([...entries].sort((a, b) => a.equipmentId.localeCompare(b.equipmentId)).map((e) => [e.equipmentId, e.quantity]));
+
+export function EquipmentChecklist({ title, description, mode, endpoint, initial, includeSoftware = false }: EquipmentChecklistProps) {
   const [catalog, setCatalog] = useState<EquipmentItem[]>([]);
-  const [selected, setSelected] = useState<Map<string, SelectedEquipment>>(
-    new Map(initial.map((entry) => [entry.equipmentId, entry]))
-  );
+  const [loading, setLoading] = useState(true);
+  const [selection, setSelection] = useState<EquipmentSelection[]>(initial.map(({ equipmentId, quantity }) => ({ equipmentId, quantity })));
+  const [savedKey, setSavedKey] = useState(() => serialize(initial));
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const notesById = useMemo(() => new Map(initial.map((e) => [e.equipmentId, e.notes])), [initial]);
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/equipment")
       .then((res) => res.json())
-      .then((json) => {
-        if (json.success) setCatalog(json.data);
-      }).catch(() => setError("Unable to load equipment. Please refresh the page."));
+      .then((json) => { if (!cancelled && json.success) setCatalog(json.data); })
+      .catch(() => { if (!cancelled) setError("Couldn't load the equipment catalog. Refresh the page to try again."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  function toggle(equipmentId: string) {
-    setSaved(false);
-    setSelected((prev) => {
-      const next = new Map(prev);
-      if (next.has(equipmentId)) {
-        next.delete(equipmentId);
-      } else {
-        next.set(equipmentId, { equipmentId, quantity: 1, notes: "" });
-      }
-      return next;
-    });
-  }
-
-  function updateQuantity(equipmentId: string, quantity: number) {
-    setSaved(false);
-    setSelected((prev) => {
-      const next = new Map(prev);
-      const entry = next.get(equipmentId);
-      if (entry) next.set(equipmentId, { ...entry, quantity: Math.max(1, quantity) });
-      return next;
-    });
-  }
+  const dirty = serialize(selection) !== savedKey;
 
   async function handleSave() {
     setSaving(true);
     setError(null);
-    setSaved(false);
     try {
-      const payload =
-        mode === "needs"
-          ? { needs: Array.from(selected.values()) }
-          : { offerings: Array.from(selected.values()) };
-
+      const entries = selection.map((s) => ({ ...s, notes: notesById.get(s.equipmentId) ?? "" }));
       const res = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(mode === "needs" ? { needs: entries } : { offerings: entries }),
       });
       const json = await res.json();
       if (!json.success) {
-        setError(json.message ?? "Unable to save your technical rider.");
+        setError(json.message ?? "Couldn't save your changes.");
         return;
       }
-      setSaved(true);
+      setSavedKey(serialize(selection));
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2500);
     } catch {
-      setError("Unable to save your technical rider right now.");
+      setError("Couldn't save your changes right now.");
     } finally {
       setSaving(false);
     }
   }
 
-  const categories = Array.from(new Set(catalog.map((item) => item.category)));
-
   return (
-    <Card className="mt-6">
+    <Card className="mt-6 overflow-hidden">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {error && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        )}
-        {categories.map((category) => (
-          <div key={category}>
-            <h3 className="mb-2 text-sm font-semibold text-stone-700">{category}</h3>
-            <div className="space-y-2">
-              {catalog
-                .filter((item) => item.category === category)
-                .map((item) => {
-                  const entry = selected.get(item.id);
-                  const isChecked = Boolean(entry);
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-stone-100 px-3 py-2"
-                    >
-                      <label className="flex flex-1 items-center gap-2 text-sm text-stone-700">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggle(item.id)}
-                          className="rounded border-stone-300"
-                        />
-                        {item.name}
-                      </label>
-                      {isChecked && (
-                        <Input
-                          type="number"
-                          min={1}
-                          max={50}
-                          value={entry!.quantity}
-                          onChange={(e) => updateQuantity(item.id, Number(e.target.value))}
-                          className="w-16 text-center"
-                          aria-label={`Quantity of ${item.name}`}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        ))}
-        {saved && <p className="text-sm text-emerald-600">Saved.</p>}
-        <Button onClick={handleSave} disabled={saving || catalog.length === 0}>
-          {saving ? "Saving..." : mode === "needs" ? "Save technical rider" : "Save equipment"}
-        </Button>
+      <CardContent className="space-y-4">
+        {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <EquipmentPicker catalog={catalog} value={selection} onChange={(next) => { setSelection(next); setJustSaved(false); }} includeSoftware={includeSoftware} loading={loading} />
       </CardContent>
+      <div className="flex items-center justify-between gap-3 border-t border-line bg-surface-strong/50 px-6 py-3">
+        <p className="flex items-center gap-2 text-sm" role="status">
+          {justSaved ? (
+            <><CircleCheck className="h-4 w-4 text-emerald-600" /><span className="text-emerald-700">Saved</span></>
+          ) : dirty ? (
+            <><span className="h-2 w-2 rounded-full bg-accent" /><span className="text-muted">Unsaved changes</span></>
+          ) : (
+            <span className="text-muted">{selection.length} {selection.length === 1 ? "item" : "items"} listed</span>
+          )}
+        </p>
+        <Button onClick={handleSave} disabled={saving || loading || !dirty}>
+          {saving ? "Saving…" : mode === "needs" ? "Save technical rider" : "Save equipment"}
+        </Button>
+      </div>
     </Card>
   );
 }

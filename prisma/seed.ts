@@ -1,17 +1,19 @@
 import { PrismaClient } from "@prisma/client";
-import { EQUIPMENT_ITEMS, CATEGORY_GROUPS, GENRE_GROUPS } from "../src/config";
+import { CUSTOM_EQUIPMENT_ITEMS, CATEGORY_GROUPS, GENRE_GROUPS } from "../src/config";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  for (const item of EQUIPMENT_ITEMS) {
+  // Synced equipment (Shopify, Wikidata) is loaded via /admin/equipment or
+  // scripts/sync-equipment-catalog.ts, not here.
+  for (const item of CUSTOM_EQUIPMENT_ITEMS) {
     await prisma.equipmentItem.upsert({
       where: { slug: item.slug },
-      update: { name: item.name, category: item.category },
-      create: { slug: item.slug, name: item.name, category: item.category },
+      update: { name: item.name, category: item.category, group: item.group },
+      create: { ...item, source: "custom", kind: "hardware", addedManually: true },
     });
   }
-  console.log(`Seeded ${EQUIPMENT_ITEMS.length} equipment items.`);
+  console.log(`Seeded ${CUSTOM_EQUIPMENT_ITEMS.length} custom equipment items.`);
 
   let subcatCount = 0;
   let instrumentCount = 0;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { invalidEquipmentSelection } from "@/lib/equipment-catalog/selectable";
 
 const equipmentSchema = z.object({
   offerings: z.array(z.object({
@@ -18,8 +19,9 @@ export async function PUT(request: Request) {
   if (!musician) return NextResponse.json({ success: false, message: "Profile not found" }, { status: 404 });
   const parsed = equipmentSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ success: false, message: "Invalid equipment quantities or notes" }, { status: 400 });
-  const ids = parsed.data.offerings.map((item) => item.equipmentId);
-  if (await prisma.equipmentItem.count({ where: { id: { in: ids } } }) !== ids.length) return NextResponse.json({ success: false, message: "Choose equipment from the catalog" }, { status: 400 });
+  const current = await prisma.musicianEquipmentOwned.findMany({ where: { musicianId: musician.id }, select: { equipmentId: true } });
+  const invalid = await invalidEquipmentSelection(parsed.data.offerings.map((item) => item.equipmentId), { previouslySelected: current.map((c) => c.equipmentId) });
+  if (invalid) return NextResponse.json({ success: false, message: invalid }, { status: 400 });
   await prisma.$transaction(async (tx) => {
     await tx.musicianEquipmentOwned.deleteMany({ where: { musicianId: musician.id } });
     await tx.musicianEquipmentOwned.createMany({ data: parsed.data.offerings.map((item) => ({ ...item, musicianId: musician.id })) });

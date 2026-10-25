@@ -60,7 +60,14 @@ export default async function MusicianProfilePage() {
             favorites: profile.favorites, performanceFee: profile.performanceFee, hourlyFee: profile.hourlyFee,
             dayFee: profile.dayFee, profileImage: profile.profileImage, bannerImage: profile.bannerImage,
           }} />
-          <EquipmentChecklist title="Equipment I can bring" description="Your own equipment, separate from what you need a venue to provide." mode="offerings" endpoint="/api/musicians/me/equipment-owned" initial={profile.equipmentOwned} />
+          <EquipmentChecklist
+            title="Gear & tools I bring"
+            description="Your own equipment and the software you work in. Clients and collaborators see this on your profile, separate from what you need a venue to provide."
+            mode="offerings"
+            endpoint="/api/musicians/me/equipment-owned"
+            initial={profile.equipmentOwned.map((o) => ({ equipmentId: o.equipmentId, quantity: o.quantity, notes: o.notes }))}
+            includeSoftware
+          />
 
           <CredentialsManager
             initial={profile.credentials.map((c) => ({ id: c.id, type: c.type, title: c.title, issuer: c.issuer, year: c.year ?? undefined }))}

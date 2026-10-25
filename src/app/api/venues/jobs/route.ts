@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { invalidEquipmentSelection } from "@/lib/equipment-catalog/selectable";
 import { jobListingSchema } from "@/lib/validations";
 import { writeAuditLog } from "@/lib/audit-log";
 import { getRequestMetadata } from "@/lib/request-context";
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
   try { if (status === "published") instants = validateCallForPublishing(schedule); }
   catch (error) { return NextResponse.json({ success: false, message: (error as Error).message }, { status: 400 }); }
   const equipmentIds = rest.eventEquipment?.map((item) => item.equipmentId) ?? [];
-  if (equipmentIds.length && await prisma.equipmentItem.count({ where: { id: { in: equipmentIds } } }) !== equipmentIds.length) return NextResponse.json({ success: false, message: "Choose equipment from the catalog." }, { status: 400 });
+  const invalidEquipment = await invalidEquipmentSelection(equipmentIds, { hardwareOnly: true });
+  if (invalidEquipment) return NextResponse.json({ success: false, message: invalidEquipment }, { status: 400 });
   const lineup = slots ?? (slotLabels?.length ? slotLabels.map((label) => ({ label })) : [{ label: "Performance" }]);
 
   const listing = await prisma.jobListing.create({

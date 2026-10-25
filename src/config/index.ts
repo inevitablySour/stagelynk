@@ -393,31 +393,37 @@ export const P2P_QUESTIONNAIRE: P2PQuestionnaireQuestion[] = [
   },
 ];
 
-// ── Technical rider equipment catalog ───────────────────────
-export const EQUIPMENT_CATEGORIES = ["Sound", "Lighting", "Staging", "Backline", "Power", "Other"] as const;
-
-export const EQUIPMENT_ITEMS: EquipmentItem[] = [
-  { id: "e1", name: "PA System", slug: "pa-system", category: "Sound" },
-  { id: "e2", name: "Vocal Microphone", slug: "vocal-microphone", category: "Sound" },
-  { id: "e3", name: "Instrument Microphone", slug: "instrument-microphone", category: "Sound" },
-  { id: "e4", name: "DI Box", slug: "di-box", category: "Sound" },
-  { id: "e5", name: "Monitor Wedge", slug: "monitor-wedge", category: "Sound" },
-  { id: "e6", name: "In-Ear Monitor System", slug: "in-ear-monitor-system", category: "Sound" },
-  { id: "e7", name: "Mixing Console", slug: "mixing-console", category: "Sound" },
-  { id: "e8", name: "DJ Mixer / Controller", slug: "dj-mixer-controller", category: "Sound" },
-  { id: "e9", name: "CDJ / Turntables", slug: "cdj-turntables", category: "Sound" },
-  { id: "e10", name: "Stage Lighting Rig", slug: "stage-lighting-rig", category: "Lighting" },
-  { id: "e11", name: "Follow Spot", slug: "follow-spot", category: "Lighting" },
-  { id: "e12", name: "Haze / Fog Machine", slug: "haze-fog-machine", category: "Lighting" },
-  { id: "e13", name: "Riser / Stage Platform", slug: "riser-stage-platform", category: "Staging" },
-  { id: "e14", name: "Backdrop / Projection Screen", slug: "backdrop-projection-screen", category: "Staging" },
-  { id: "e15", name: "Drum Kit", slug: "drum-kit", category: "Backline" },
-  { id: "e16", name: "Bass Amp", slug: "bass-amp", category: "Backline" },
-  { id: "e17", name: "Guitar Amp", slug: "guitar-amp", category: "Backline" },
-  { id: "e18", name: "Keyboard / Piano", slug: "keyboard-piano", category: "Backline" },
-  { id: "e19", name: "Power Distribution (generator/mains)", slug: "power-distribution", category: "Power" },
-  { id: "e20", name: "Green Room / Dressing Area", slug: "green-room", category: "Other" },
+// ── Custom equipment ─────────────────────────────────────────
+// Rider-specific items the synced taxonomies don't cover. Everything else in
+// the equipment catalog comes from the Shopify and Wikidata syncs, managed
+// at /admin/equipment.
+export const CUSTOM_EQUIPMENT_ITEMS: Pick<EquipmentItem, "name" | "slug" | "category" | "group">[] = [
+  { name: "Vocal Microphone", slug: "vocal-microphone", category: "Core audio", group: "live-sound" },
+  { name: "Instrument Microphone", slug: "instrument-microphone", category: "Core audio", group: "live-sound" },
+  { name: "Stage Lighting Rig", slug: "stage-lighting-rig", category: "Stage lighting", group: "lighting" },
+  { name: "Follow Spot", slug: "follow-spot", category: "Stage lighting", group: "lighting" },
+  { name: "Backdrop / Projection Screen", slug: "backdrop-projection-screen", category: "Stage & rigging", group: "staging" },
+  { name: "Green Room / Dressing Area", slug: "green-room", category: "Venue facilities", group: "staging" },
+  { name: "Power Distribution (generator/mains)", slug: "power-distribution", category: "Power", group: "cabling" },
 ];
+
+// Original hand-written items now covered by a Shopify category; their
+// references are moved onto the Shopify item (scripts/merge-legacy-equipment.ts).
+export const LEGACY_EQUIPMENT_MERGES: Record<string, string> = {
+  "pa-system": "shopify-el-2-6",
+  "di-box": "shopify-el-2-2-6",
+  "monitor-wedge": "shopify-el-2-7-6",
+  "in-ear-monitor-system": "shopify-el-2-7-2",
+  "mixing-console": "shopify-el-2-2-3",
+  "dj-mixer-controller": "shopify-el-2-5-4",
+  "cdj-turntables": "shopify-el-2-5-1",
+  "haze-fog-machine": "shopify-ae-3-3-2",
+  "riser-stage-platform": "shopify-el-2-7-4",
+  "drum-kit": "shopify-ae-2-8-5-3",
+  "bass-amp": "shopify-ae-2-7-10-2",
+  "guitar-amp": "shopify-ae-2-7-10-3",
+  "keyboard-piano": "shopify-ae-2-8-4-3",
+};
 
 // ── Membership Tiers ────────────────────────────────────────
 export const MEMBERSHIP_TIERS: MembershipTier[] = [

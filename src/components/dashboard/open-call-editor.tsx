@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { HierarchicalPicker } from "@/components/common/hierarchical-picker";
+import { EquipmentPicker } from "@/components/equipment/equipment-picker";
 import { GENRE_GROUPS } from "@/config";
 import type { OpenCallRow } from "@/lib/open-calls";
 import type { EquipmentItem } from "@/types";
@@ -103,10 +104,13 @@ export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { i
       <div><label htmlFor="call-stageSpecs" className="mb-2 block text-sm font-medium">Stage setup & technical specifications</label><textarea id="call-stageSpecs" name="stageSpecs" defaultValue={initial?.stageSpecs} maxLength={3000} className="min-h-24 w-full rounded-xl border border-line bg-surface p-3 text-sm" placeholder="Stage dimensions, power, access, soundcheck, limits…" /></div>
       {field("requiredServices", "Required services (comma-separated)", initial?.requiredServices.join(", "))}
       <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={useVenueEquipment} onChange={(event) => setUseVenueEquipment(event.target.checked)} />Use my venue&apos;s current in-house equipment for technical matching</label>
-      {!useVenueEquipment && <fieldset><legend className="mb-3 text-sm font-medium">Equipment at this event / external venue</legend><div className="grid gap-2 sm:grid-cols-2">{catalog.map((item) => {
-        const selected = equipment.find((entry) => entry.equipmentId === item.id);
-        return <div key={item.id} className="flex items-center gap-3 rounded-xl border border-line p-3"><label className="flex flex-1 items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(selected)} onChange={(event) => setEquipment((previous) => event.target.checked ? [...previous, { equipmentId: item.id, quantity: 1 }] : previous.filter((entry) => entry.equipmentId !== item.id))} />{item.name}</label>{selected && <Input aria-label={`${item.name} quantity`} type="number" min={1} max={50} className="w-16" value={selected.quantity} onChange={(event) => setEquipment((previous) => previous.map((entry) => entry.equipmentId === item.id ? { ...entry, quantity: Number(event.target.value) } : entry))} />}</div>;
-      })}</div><p className="mt-3 text-xs text-muted">An empty list explicitly means no equipment is provided.</p></fieldset>}
+      {!useVenueEquipment && (
+        <fieldset className="rounded-2xl border border-line p-4">
+          <legend className="px-1 text-sm font-medium">Equipment at this event / external venue</legend>
+          <EquipmentPicker catalog={catalog} value={equipment} onChange={setEquipment} loading={catalog.length === 0 && !error} />
+          <p className="mt-3 text-xs text-muted">An empty list explicitly means no equipment is provided.</p>
+        </fieldset>
+      )}
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="flex flex-wrap gap-3"><Button type="submit" value="draft" variant="outline" disabled={busy}>Save draft</Button><Button type="submit" value="published" disabled={busy}>{busy ? "Saving…" : "Save & publish"}</Button><Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button></div>
     </form>

@@ -926,18 +926,85 @@ model MusicianService {
   @@index([portfolioAlbumId])
 }
 
+enum EquipmentKind {
+  hardware
+  software
+}
+
+enum EquipmentSource {
+  custom
+  shopify
+  wikidata
+}
+
+// active: shown in pickers. pending: synced, awaiting admin approval.
+// rejected: admin declined; syncs never resurrect it. hidden: admin hid an
+// active item. retired: a sync no longer returns it. Retired/hidden items
+// stay valid for existing selections but are not offered for new ones.
+enum EquipmentStatus {
+  active
+  pending
+  rejected
+  hidden
+  retired
+}
+
 model EquipmentItem {
-  id       String @id @default(cuid())
-  name     String @unique
-  slug     String @unique
-  category String @default("Other")
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  category    String          @default("Other")
+  group       String          @default("other")
+  kind        EquipmentKind   @default(hardware)
+  source      EquipmentSource @default(custom)
+  externalId  String?
+  path        String          @default("")
+  description String?
+  status      EquipmentStatus @default(active)
+  // Set when an admin edits name/category/group; syncs then leave those
+  // fields alone.
+  adminLocked   Boolean   @default(false)
+  // Imported one-off by an admin rather than produced by a sync query, so a
+  // sync never retires it for being absent from its results.
+  addedManually Boolean   @default(false)
+  lastSyncedAt  DateTime?
 
-  musicianNeeds MusicianEquipmentNeed[]
+  musicianNeeds  MusicianEquipmentNeed[]
   venueOfferings VenueEquipmentOffering[]
-  musicianOwned MusicianEquipmentOwned[]
+  musicianOwned  MusicianEquipmentOwned[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, externalId])
   @@index([slug])
   @@index([category])
+  @@index([group])
+  @@index([status])
+}
+
+enum EquipmentSyncStatus {
+  previewed
+  applied
+  failed
+}
+
+// A sync preview stores the exact validated candidate list so that applying
+// it writes what the admin reviewed, not a fresh, unreviewed fetch.
+model EquipmentSyncRun {
+  id          String              @id @default(cuid())
+  source      EquipmentSource
+  status      EquipmentSyncStatus @default(previewed)
+  version     String              @default("")
+  candidates  Json                @default("[]")
+  summary     Json                @default("{}")
+  error       String?             @db.Text
+  createdById String?
+  appliedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([source, createdAt])
 }
 
 model MusicianEquipmentNeed {

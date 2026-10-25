@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit-log";
 import { getRequestMetadata } from "@/lib/request-context";
+import { invalidEquipmentSelection } from "@/lib/equipment-catalog/selectable";
 
 const equipmentOfferingsSchema = z.object({
   offerings: z.array(
@@ -52,6 +53,13 @@ export async function PUT(request: Request) {
       { status: 400 }
     );
   }
+
+  const current = await prisma.venueEquipmentOffering.findMany({ where: { venueId: venue.id }, select: { equipmentId: true } });
+  const invalid = await invalidEquipmentSelection(parsed.data.offerings.map((o) => o.equipmentId), {
+    previouslySelected: current.map((c) => c.equipmentId),
+    hardwareOnly: true,
+  });
+  if (invalid) return NextResponse.json({ success: false, message: invalid }, { status: 400 });
 
   await prisma.$transaction([
     prisma.venueEquipmentOffering.deleteMany({ where: { venueId: venue.id } }),
