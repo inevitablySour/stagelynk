@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
+import { recordCardFingerprint } from "@/lib/p2p-policy";
 
 export async function GET() {
   const session = await auth();
@@ -19,6 +20,8 @@ export async function GET() {
     stripe.paymentMethods.list({ customer: venue.stripeCustomerId, type: "card" }),
     stripe.customers.retrieve(venue.stripeCustomerId),
   ]);
+
+  await Promise.all(paymentMethods.data.map((pm) => recordCardFingerprint(session.user.id, "venue", pm.card?.fingerprint)));
 
   const defaultPaymentMethodId =
     !customer.deleted && typeof customer.invoice_settings?.default_payment_method === "string"

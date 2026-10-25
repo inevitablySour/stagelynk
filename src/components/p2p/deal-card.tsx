@@ -75,12 +75,13 @@ export function DealCard({ deal, currentMusicianId }: { deal: DealRow; currentMu
         {rows.description && <p className="text-sm text-stone-600">{rows.description}</p>}
 
         {rows.dealType === "flat_fee" && (
-          <p className="text-sm text-stone-900">
-            {formatMoney(rows.rateAmount ?? 0, rows.currency)} / {rows.rateBasis}
-          </p>
+          <>
+            <p className="text-sm text-stone-900">{formatMoney(rows.rateAmount ?? 0, rows.currency)} / {rows.rateBasis}</p>
+            <p className="text-xs text-stone-500">The payer covers a reduced platform fee on top; the receiving artist gets the full amount.</p>
+          </>
         )}
 
-        {rows.dealType === "split_50_50" && <p className="text-sm text-stone-900">50/50 split — no platform fee, no cash changes hands here.</p>}
+        {rows.dealType === "split_50_50" && <p className="text-sm text-stone-900">50/50 split: no cash changes hands here, so no platform fee.</p>}
 
         {rows.dealType === "milestone" && (
           <div className="space-y-2">

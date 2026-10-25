@@ -66,6 +66,15 @@ export default function TermsPage() {
                 the clearance period at its discretion, including to respond to a specific dispute or
                 suspected fraud risk.
               </p>
+              <p className="mt-2">
+                Creatives may also agree collaboration deals with each other through {APP_NAME}. Cash
+                collaboration deals carry a reduced platform fee (currently 2.5%), paid by the paying
+                Creative on top of the agreed amount. Collaboration deals exist for Creatives working with
+                each other. They may not be used to hire for, or to pay for, work on behalf of a venue or
+                client, or to otherwise avoid the standard platform fee, including by operating more than
+                one account. {APP_NAME} may apply the standard fee to any collaboration deal, may limit the
+                volume of collaboration payments, and may suspend accounts that breach this section.
+              </p>
             </section>
 
             <section>

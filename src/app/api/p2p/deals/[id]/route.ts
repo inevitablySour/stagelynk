@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import { placePeerHold, capturePeerHold, transferToPeer } from "@/lib/p2p-escrow";
+import { payerBlockReason, resolveP2PFeeRate } from "@/lib/p2p-policy";
 import { getLogger } from "@/lib/logger";
 
 const log = getLogger("api-p2p-deals");
@@ -88,12 +89,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ success: false, message: "The paying artist needs a default card on file." }, { status: 400 });
       }
 
+      const blocked = await payerBlockReason(payer.id, match.conversationId);
+      if (blocked) return NextResponse.json({ success: false, message: blocked }, { status: 403 });
+
       try {
+        const { rate, reason } = await resolveP2PFeeRate({
+          payerMusicianId: payer.id, payerUserId: payer.userId, paymentMethodId, amount: deal.rateAmount!,
+        });
         const { paymentIntent } = await placePeerHold({
           payerCustomerId: payer.stripeCustomerId,
           payerPaymentMethodId: paymentMethodId,
           amount: deal.rateAmount!,
           currency: deal.currency,
+          platformFeeRate: rate,
+          metadata: { dealId: deal.id, feeReason: reason },
         });
         await capturePeerHold(paymentIntent.id);
         await transferToPeer({
@@ -167,12 +176,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ success: false, message: "Add a default card before approving a milestone." }, { status: 400 });
     }
 
+    const blocked = await payerBlockReason(payer.id, match.conversationId);
+    if (blocked) return NextResponse.json({ success: false, message: blocked }, { status: 403 });
+
     try {
+      const { rate, reason } = await resolveP2PFeeRate({
+        payerMusicianId: payer.id, payerUserId: payer.userId, paymentMethodId, amount: milestone.amount,
+      });
       const { paymentIntent } = await placePeerHold({
         payerCustomerId: payer.stripeCustomerId,
         payerPaymentMethodId: paymentMethodId,
         amount: milestone.amount,
         currency: deal.currency,
+        platformFeeRate: rate,
+        metadata: { dealId: deal.id, milestoneId: milestone.id, feeReason: reason },
       });
       await capturePeerHold(paymentIntent.id);
       await transferToPeer({

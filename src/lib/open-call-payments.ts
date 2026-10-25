@@ -6,10 +6,12 @@ import { isCallOpen, effectiveBudget } from "@/lib/open-call-utils";
 import { hasArtistConflict } from "@/lib/artist-conflicts";
 import { sendJobApplicationStatusEmail } from "@/lib/email-templates";
 import { getLogger } from "@/lib/logger";
+import { recordVenueCard } from "@/lib/p2p-policy";
 
 const log = getLogger("open-call-payments");
 
 export async function reserveOpenCall(applicationId: string, venueId: string, expectedFee: number, customerId: string, paymentMethodId: string) {
+  void recordVenueCard(venueId, paymentMethodId);
   const original = await prisma.jobApplication.findUniqueOrThrow({ where: { id: applicationId } });
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "JobListing" WHERE "id" = ${original.jobListingId} FOR UPDATE`;

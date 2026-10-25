@@ -44,7 +44,7 @@ export default async function P2PDiscoverPage() {
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-stone-900">Collaborate</h1>
-              <p className="mt-1 text-stone-500">Find other creatives to work with directly — no platform fee.</p>
+              <p className="mt-1 text-stone-500">Find other creatives to work with directly. Cash deals carry a reduced platform fee, and 50/50 splits are free.</p>
             </div>
             <Button variant="outline" size="sm" asChild>
               <Link href="/musician/p2p/questionnaire">Compatibility questionnaire</Link>

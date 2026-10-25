@@ -43,7 +43,7 @@ export function BookingRequestCard({ musicianId, stageName, viewer }: BookingReq
           {state === "owner"
             ? "This is how clients see your profile. You cannot book yourself; update your details from your profile editor."
             : state === "creative"
-              ? "Direct booking requests are for venue and client accounts. As a creative, you can match with this artist to collaborate directly, with no platform fee."
+              ? "Direct booking requests are for venue and client accounts. As a creative, you can match with this artist to collaborate directly, with a reduced platform fee on cash deals."
               : state === "admin"
                 ? "You're signed in as an administrator. Direct booking requests require a venue or client account."
                 : "A live set, a new project, a creative idea. Share the details and propose your fee."}

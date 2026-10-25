@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Handshake, Package, ShieldAlert, ShieldCheck } from "lucide-react";
 import { APP_NAME } from "@/config";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/admin/equipment", label: "Equipment catalog", icon: Package },
   { href: "/admin/disputes", label: "Disputes", icon: ShieldAlert },
+  { href: "/admin/p2p-risk", label: "Collaboration payments", icon: Handshake },
 ];
 
 export function AdminShell({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {

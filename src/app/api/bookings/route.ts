@@ -9,6 +9,7 @@ import { writeAuditLog } from "@/lib/audit-log";
 import { sendBookingRequestEmail } from "@/lib/email-templates";
 import { getRequestMetadata } from "@/lib/request-context";
 import { getLogger } from "@/lib/logger";
+import { recordVenueCard } from "@/lib/p2p-policy";
 
 const log = getLogger("api-bookings-post");
 const NEGOTIATION_RESPONSE_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
   // replaced on an accepted counter-offer. See .claude/skills/stripe-connect/SKILL.md.
   let paymentIntent: Stripe.PaymentIntent;
   try {
+    void recordVenueCard(venue.id, parsed.data.paymentMethodId);
     paymentIntent = await stripe.paymentIntents.create({
       amount: toMinorUnits(fees.totalChargeAmount),
       currency: (parsed.data.currency ?? "EUR").toLowerCase(),

@@ -1298,3 +1298,17 @@ model ArtistOpenCallApplication {
   @@unique([callId, applicantId])
   @@index([applicantId])
 }
+
+// Card fingerprints let P2P payments detect a card that also pays for venue
+// accounts, so cash collaboration deals can't be used to dodge the full fee.
+model CardFingerprint {
+  id          String   @id @default(cuid())
+  fingerprint String
+  userId      String
+  ownerRole   UserRole
+  createdAt   DateTime @default(now())
+
+  @@unique([fingerprint, userId])
+  @@index([fingerprint])
+  @@index([userId])
+}

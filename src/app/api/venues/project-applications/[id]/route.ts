@@ -6,6 +6,7 @@ import { stripe, toMinorUnits } from "@/lib/stripe";
 import { calculateMarketplaceFees } from "@/lib/marketplace-fees";
 import { writeAuditLog } from "@/lib/audit-log";
 import { getLogger } from "@/lib/logger";
+import { recordVenueCard } from "@/lib/p2p-policy";
 
 const log = getLogger("api-venues-project-applications");
 
@@ -62,6 +63,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ success: false, message: "No agreed fee for this application. Have the artist propose one." }, { status: 400 });
   }
   const fees = calculateMarketplaceFees(fee, { currency: application.projectListing.currency });
+
+  void recordVenueCard(venue.id, paymentMethodId);
 
   try {
     const paymentIntent = await stripe.paymentIntents.create({

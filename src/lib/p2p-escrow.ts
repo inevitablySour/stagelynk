@@ -4,8 +4,10 @@ import { calculatePeerPayoutFees } from "@/lib/p2p-fees";
 
 /**
  * Charges the paying artist's saved card for a P2P deal (or milestone).
- * Manual capture, same separate-charges-and-transfers shape as bookings,
- * but always zero platform fee (see p2p-fees.ts). See
+ * Manual capture, same separate-charges-and-transfers shape as bookings.
+ * The payer is charged the deal amount plus a platform fee (reduced for
+ * genuine collaboration, standard otherwise; see p2p-policy.ts) and Stripe's
+ * processing fee. See
  * .claude/skills/stripe-connect/SKILL.md.
  */
 export async function placePeerHold(params: {
@@ -13,8 +15,10 @@ export async function placePeerHold(params: {
   payerPaymentMethodId: string;
   amount: number;
   currency: string;
+  platformFeeRate: number;
+  metadata?: Record<string, string>;
 }) {
-  const fees = calculatePeerPayoutFees(params.amount, { currency: params.currency });
+  const fees = calculatePeerPayoutFees(params.amount, { currency: params.currency, platformFeeRate: params.platformFeeRate });
   const paymentIntent = await stripe.paymentIntents.create({
     amount: toMinorUnits(fees.totalChargeAmount),
     currency: params.currency.toLowerCase(),
@@ -23,6 +27,7 @@ export async function placePeerHold(params: {
     capture_method: "manual",
     off_session: true,
     confirm: true,
+    metadata: { kind: "p2p", platformFeeRate: String(params.platformFeeRate), ...params.metadata },
   });
   return { paymentIntent, fees };
 }
@@ -41,8 +46,9 @@ export async function capturePeerHold(paymentIntentId: string) {
 }
 
 /**
- * Transfers the full deal/milestone amount to the payee's Connect account —
- * never less, since no platform fee is ever retained from a P2P deal. Draws
+ * Transfers the full deal/milestone amount to the payee's Connect account.
+ * The platform fee is retained by transferring the deal amount rather than
+ * the whole charge (never via application_fee_amount). Draws
  * from the original charge via source_transaction, same as booking payouts.
  */
 export async function transferToPeer(params: {
