@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { ArtistDirectory } from "@/components/artists/artist-directory";
@@ -9,7 +10,9 @@ import Link from "next/link";
 export const metadata = { title: "Discover Talent" };
 
 export default async function ArtistsPage() {
-  const artists = await discoverArtists(discoveryQuerySchema.parse({}));
+  // A fresh random order per visit; the same seed goes to the client so its first fetch keeps this order.
+  const seed = randomInt(0, 2147483647);
+  const artists = await discoverArtists(discoveryQuerySchema.parse({ seed }));
 
   return (
     <>
@@ -26,7 +29,7 @@ export default async function ArtistsPage() {
             </div>
           </section>
 
-          <ArtistDirectory artists={artists} />
+          <ArtistDirectory artists={artists} seed={seed} />
         </div>
       </main>
       <Footer />

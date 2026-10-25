@@ -1,3 +1,4 @@
+import { LINK_FIELDS, LINK_KEYS, normalizeLink, portfolioKindsFor, sectionsFor } from "@/lib/portfolio-links";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, MapPin, Clock, Calendar, AudioLines, Award, SlidersHorizontal, Star } from "lucide-react";
@@ -54,7 +55,12 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
   const category = artist.categoryPicks[0]?.groupName ?? "Creative";
   const upcomingAvailability = artist.availability;
   const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-  const links = Object.entries(socialLinks).filter((entry): entry is [string, string] => Boolean(entry[1]));
+  const linkSections = sectionsFor(portfolioKindsFor(artist.categoryPicks.map((pick) => pick.groupSlug)));
+  const linkedKeys = new Set(linkSections.flatMap((section) => section.keys));
+  const profileLinks = [
+    ...linkSections.map((section) => ({ title: section.title, items: section.keys.map((key) => ({ key, url: normalizeLink(key, socialLinks[key]) })).filter((item) => item.url) })),
+    { title: "More", items: LINK_KEYS.filter((key) => !linkedKeys.has(key)).map((key) => ({ key, url: normalizeLink(key, socialLinks[key]) })).filter((item) => item.url) },
+  ].filter((section) => section.items.length > 0);
 
   return (
     <>
@@ -202,7 +208,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                   {upcomingAvailability.length > 0 && <p className="mt-3 text-xs leading-5 text-muted">Dates are artist-provided. Your booking is confirmed only after acceptance and successful payment.</p>}
                 </CardContent>
               </Card>
-              {links.length > 0 && <Card><CardHeader><CardTitle className="text-base">Elsewhere on the web</CardTitle></CardHeader><CardContent className="space-y-2">{links.map(([key, url]) => <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-xl border border-line px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-brand hover:bg-brand-soft"><span className="capitalize">{key === "appleMusic" ? "Apple Music" : key}</span><ArrowUpRight className="h-4 w-4 text-brand" /></a>)}</CardContent></Card>}
+              {profileLinks.length > 0 && <Card><CardHeader><CardTitle className="text-base">Portfolio &amp; links</CardTitle></CardHeader><CardContent className="space-y-5">{profileLinks.map((section) => <div key={section.title}><p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted">{section.title}</p><div className="space-y-2">{section.items.map(({ key, url }) => <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-xl border border-line px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-brand hover:bg-brand-soft"><span>{LINK_FIELDS[key].label}</span><ArrowUpRight className="h-4 w-4 text-brand" /></a>)}</div></div>)}</CardContent></Card>}
               <Link href="/artists" className="flex items-center justify-center gap-2 py-2 text-sm font-medium text-muted hover:text-brand">Explore more creatives <ArrowUpRight className="h-4 w-4" /></Link>
             </aside>
           </div>

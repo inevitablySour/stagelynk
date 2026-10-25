@@ -18,10 +18,11 @@ const CATEGORY_PICKER_GROUPS = CATEGORY_GROUPS.map((g) => ({
 }));
 
 interface ArtistDirectoryProps {
+  seed?: number;
   artists: MusicianProfile[];
 }
 
-export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProps) {
+export function ArtistDirectory({ artists: initialArtists, seed: initialSeed }: ArtistDirectoryProps) {
   const [query, setQuery] = useState("");
   const [selectedGenreGroups, setSelectedGenreGroups] = useState<string[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
@@ -39,7 +40,8 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
   const [searchError, setSearchError] = useState(false);
   const [instrument, setInstrument] = useState("");
   const [maxFee, setMaxFee] = useState("");
-  const [sortBy, setSortBy] = useState("rating");
+  const [sortBy, setSortBy] = useState("random");
+  const [seed] = useState(() => initialSeed ?? Math.floor(Math.random() * 2147483647));
   const [credentialType, setCredentialType] = useState("");
 
   const activeFilterCount =
@@ -126,6 +128,7 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
     if (maxFee) params.set("maxFee", maxFee);
     if (credentialType) params.set("credentialType", credentialType);
     params.set("sortBy", blindScout ? "blind_scout" : sortBy);
+    if (sortBy === "random") params.set("seed", String(seed));
 
     Promise.resolve().then(() => {
       setIsLoading(true);
@@ -286,7 +289,7 @@ export function ArtistDirectory({ artists: initialArtists }: ArtistDirectoryProp
           {isLoading ? "Finding your creative fit…" : `${artists.length} creative ${artists.length === 1 ? "connection" : "connections"} to explore`}
         </p>
         {(activeFilterCount > 0 || query) && <button type="button" onClick={() => { clearAll(); setQuery(""); }} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"><X className="h-3.5 w-3.5" />Clear search & filters</button>}
-        {!blindScout && <label className="flex items-center gap-2 text-xs text-muted">Sort by<select aria-label="Sort creatives" value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2"><option value="rating">Weighted rating</option><option value="experience">Experience</option><option value="newest">Newest</option><option value="name">Name</option></select></label>}
+        {!blindScout && <label className="flex items-center gap-2 text-xs text-muted">Sort by<select aria-label="Sort creatives" value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2"><option value="random">Random</option><option value="rating">Weighted rating</option><option value="experience">Experience</option><option value="newest">Newest</option><option value="name">Name</option></select></label>}
       </div>
       {searchError && <p role="alert" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Search couldn&apos;t refresh. The results below may be out of date. Try changing a filter or refreshing the page.</p>}
 

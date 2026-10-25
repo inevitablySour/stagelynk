@@ -20,7 +20,7 @@ export default async function MusicianProfilePage() {
     include: {
       mainGenreGroup: true,
       genrePicks: { include: { subtype: true } },
-      categoryPicks: { include: { subtype: true, instrumentType: true } },
+      categoryPicks: { include: { subtype: { include: { group: true } }, instrumentType: true } },
       services: { include: { service: true } },
       equipmentNeeds: true,
       equipmentOwned: true,
@@ -53,7 +53,7 @@ export default async function MusicianProfilePage() {
             }}
           />
 
-          <MusicianSocialForm initial={(profile.socialLinks as SocialLinks) ?? {}} />
+          <MusicianSocialForm initial={(profile.socialLinks as SocialLinks) ?? {}} categoryGroupSlugs={[...new Set(profile.categoryPicks.map((p) => p.subtype.group.slug))]} />
           <ArtistDiscoveryDetailsForm initial={{
             categoryPicks: profile.categoryPicks.map((p) => ({ subtypeSlug: p.subtype.slug, instrumentTypeSlug: p.instrumentType?.slug })),
             influences: profile.influences,

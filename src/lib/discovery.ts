@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { serializeMusicianProfile } from "@/lib/serializers";
 import { rankBlindScout } from "@/lib/blind-scout";
-import { discoveryQuerySchema, includesTag } from "@/lib/discovery-utils";
+import { discoveryQuerySchema, includesTag, seededShuffle } from "@/lib/discovery-utils";
 import { withinLeeway } from "@/lib/rate-leeway";
 import type { z } from "zod/v4";
 
@@ -62,6 +62,7 @@ export async function discoverArtists(filters: z.infer<typeof discoveryQuerySche
   const withRateInfo = applyRateFilter(results, filters.minFee, filters.maxFee, filters.feeBasis);
 
   if (filters.sortBy === "blind_scout") return rankBlindScout(withRateInfo, filters.genre);
+  if (filters.sortBy === "random") return seededShuffle(withRateInfo, filters.seed ?? Math.floor(Math.random() * 2147483647));
   return withRateInfo.sort((a, b) => {
     if (filters.sortBy === "name") return a.stageName.localeCompare(b.stageName);
     if (filters.sortBy === "experience") return b.experienceYears - a.experienceYears;

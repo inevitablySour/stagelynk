@@ -1,3 +1,4 @@
+import type { LinkKey } from "@/lib/portfolio-links";
 // ── User & Auth ──────────────────────────────────────────────
 export type UserRole = "musician" | "venue" | "admin";
 
@@ -57,17 +58,7 @@ export interface MusicianProfile {
   createdAt: string;
 }
 
-export interface SocialLinks {
-  website?: string;
-  instagram?: string;
-  twitter?: string;
-  facebook?: string;
-  youtube?: string;
-  spotify?: string;
-  appleMusic?: string;
-  soundcloud?: string;
-  tiktok?: string;
-}
+export type SocialLinks = Partial<Record<LinkKey, string>>;
 
 export interface AvailabilitySlot {
   id: string;

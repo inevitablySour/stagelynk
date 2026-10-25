@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
 import { calendarDate, normalizeTags } from "@/lib/discovery-utils";
 import { PAYMENT_STRUCTURES } from "@/lib/payment-structures";
+import { LINK_FIELDS, LINK_KEYS, normalizeLink, type LinkKey } from "@/lib/portfolio-links";
 
 const money = z.number().finite().min(0).max(1000000).multipleOf(0.01);
 const tags = z.array(z.string().trim().min(1).max(80)).max(20).transform(normalizeTags);
@@ -94,17 +95,13 @@ export const registerSchema = z.object({
   acceptedTerms: z.literal(true, { message: "You must accept the Terms of Service to create an account." }),
 });
 
-export const socialLinksSchema = z.object({
-  website: z.string().max(300).optional(),
-  instagram: z.string().max(300).optional(),
-  twitter: z.string().max(300).optional(),
-  facebook: z.string().max(300).optional(),
-  youtube: z.string().max(300).optional(),
-  spotify: z.string().max(300).optional(),
-  appleMusic: z.string().max(300).optional(),
-  soundcloud: z.string().max(300).optional(),
-  tiktok: z.string().max(300).optional(),
-});
+// Each link is normalised to an https URL (an Instagram @handle becomes a
+// profile link); anything that can't be read as a web link is rejected.
+export const socialLinksSchema = z.object(
+  Object.fromEntries(LINK_KEYS.map((key) => [key, z.string().max(300).superRefine((value, ctx) => {
+    if (value.trim() && !normalizeLink(key, value)) ctx.addIssue({ code: "custom", message: `${LINK_FIELDS[key].label} must be a web link` });
+  }).transform((value) => normalizeLink(key, value)).optional()])) as Record<LinkKey, z.ZodOptional<z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>>>
+);
 
 // A musician picks up to 3 subcategories per broad CategoryGroup. Each pick
 // names the subcategory slug and, only for "Instrumentalist & Session
