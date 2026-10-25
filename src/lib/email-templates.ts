@@ -337,3 +337,50 @@ export async function sendArtistCallApplicationEmail(
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
+
+export async function sendBalanceChargedEmail(
+  to: Recipient,
+  details: { otherPartyName: string; eventDate: Date; amount: number; currency: string }
+) {
+  await sendEmail({
+    from: { email: MAIL_FROM.noreply, name: APP_NAME },
+    to: [to],
+    subject: "Balance payment received",
+    text: `The remaining balance of ${formatMoney(details.amount, details.currency)} for the booking with ${details.otherPartyName} was charged.`,
+    html: renderEmailHtml({
+      heading: "Balance payment received",
+      bodyHtml: `<p>The remaining balance of <strong>${formatMoney(details.amount, details.currency)}</strong> for the booking with <strong>${escapeHtml(details.otherPartyName)}</strong> was charged. The booking is now paid in full.</p>`,
+      button: { label: "View bookings", url: appUrl("/") },
+    }),
+  });
+}
+
+export async function sendBalanceFailedEmail(
+  to: Recipient,
+  details: { otherPartyName: string; eventDate: Date }
+) {
+  await sendEmail({
+    from: { email: MAIL_FROM.noreply, name: APP_NAME },
+    to: [to],
+    subject: "Balance payment failed",
+    text: `The balance payment for the booking with ${details.otherPartyName} couldn't be charged. We'll retry automatically; please check the saved card.`,
+    html: renderEmailHtml({
+      heading: "Balance payment failed",
+      bodyHtml: `<p>The balance payment for the booking with <strong>${escapeHtml(details.otherPartyName)}</strong> couldn't be charged. We'll keep retrying automatically until the event. Please check that the saved card is valid.</p>`,
+      button: { label: "Check payment methods", url: appUrl("/venue/payment-methods") },
+    }),
+  });
+}
+
+export async function sendMilestoneEmail(
+  to: Recipient,
+  details: { heading: string; message: string }
+) {
+  await sendEmail({
+    from: { email: MAIL_FROM.noreply, name: APP_NAME },
+    to: [to],
+    subject: details.heading,
+    text: details.message,
+    html: renderEmailHtml({ heading: details.heading, bodyHtml: `<p>${escapeHtml(details.message)}</p>`, button: { label: "Open IndieCentral", url: appUrl("/") } }),
+  });
+}

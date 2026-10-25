@@ -66,6 +66,19 @@ enum PaymentStatus {
   cancelled
 }
 
+enum PaymentStructure {
+  full_sum
+  deposit_balance
+  milestone
+}
+
+enum MilestoneStatus {
+  pending
+  submitted
+  approved
+  paid
+}
+
 enum DisputeKind {
   cancellation
   refund_request
@@ -431,6 +444,16 @@ model Booking {
   fee                Float         @default(0)
   currency           String        @default("EUR")
   depositAmount      Float         @default(0)
+  // How the agreed fee is collected. The amount fields below (platformFee*,
+  // totalChargeAmount, netPayoutAmount) always describe the FIRST charge:
+  // the whole fee for full_sum, the deposit portion for deposit_balance, and
+  // nothing for milestone (each milestone is charged on approval). For
+  // deposit_balance, depositAmount is the deposit portion of `fee`.
+  paymentStructure   PaymentStructure @default(full_sum)
+  balanceDueAt       DateTime?
+  balanceChargedAt   DateTime?
+  balanceFailedAt    DateTime?
+  balancePaymentIntentId String?
   platformFeeRate    Float         @default(0.05)
   platformFeeAmount  Float         @default(0)
   processorFeeEstimate Float       @default(0)
@@ -459,6 +482,7 @@ model Booking {
   jobApplication JobApplication?          @relation(fields: [jobApplicationId], references: [id], onDelete: SetNull)
   projectApplication ProjectApplication?  @relation(fields: [projectApplicationId], references: [id], onDelete: SetNull)
   transactions   MarketplaceTransaction[]
+  milestones     BookingMilestone[]
   disputes       BookingDispute[]
   review         Review?
 
@@ -554,6 +578,8 @@ model JobListing {
   genres                Json             @default("[]")
   requiredServices      Json             @default("[]")
   equipmentProvided     Json             @default("[]")
+  offeredPaymentStructures PaymentStructure[] @default([full_sum])
+  depositPercent        Int              @default(30)
   applicationDeadline   DateTime?
   status                JobListingStatus @default(draft)
   isPromoted            Boolean          @default(false)
@@ -605,6 +631,8 @@ model JobApplication {
   availabilityNotes String?              @db.Text
   availabilityConfirmed Boolean          @default(false)
   paymentAttempt    Int                  @default(0)
+  selectedPaymentStructure PaymentStructure @default(full_sum)
+  proposedMilestones Json?
   status            JobApplicationStatus @default(submitted)
 
   jobListing JobListing      @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
@@ -641,6 +669,8 @@ model ProjectListing {
   categories        Json                 @default("[]")
   genres            Json                 @default("[]")
   requiredServices  Json                 @default("[]")
+  offeredPaymentStructures PaymentStructure[] @default([full_sum])
+  depositPercent    Int                  @default(30)
   status            JobListingStatus     @default(draft)
 
   venue        VenueProfile         @relation(fields: [venueId], references: [id], onDelete: Cascade)
@@ -660,6 +690,8 @@ model ProjectApplication {
   musicianId   String
   coverMessage String               @default("") @db.Text
   proposedFee  Float?
+  selectedPaymentStructure PaymentStructure @default(full_sum)
+  proposedMilestones Json?
   status       JobApplicationStatus @default(submitted)
 
   projectListing ProjectListing  @relation(fields: [projectListingId], references: [id], onDelete: Cascade)
@@ -680,6 +712,8 @@ model MarketplaceTransaction {
   bookingId            String
   provider             String?
   providerPaymentId    String?
+  // full | deposit | balance | milestone
+  transactionType      String        @default("full")
   performanceFee       Float         @default(0)
   platformFeeRate      Float         @default(0.05)
   platformFeeAmount    Float         @default(0)
@@ -1311,4 +1345,26 @@ model CardFingerprint {
   @@unique([fingerprint, userId])
   @@index([fingerprint])
   @@index([userId])
+}
+
+// Milestone-paid marketplace bookings: each milestone is charged and
+// transferred when the client approves it (see api/bookings/[id]/milestones).
+model BookingMilestone {
+  id        String          @id @default(cuid())
+  bookingId String
+  label     String
+  amount    Float
+  order     Int             @default(0)
+  status    MilestoneStatus @default(pending)
+  stripePaymentIntentId String?
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  paidAt      DateTime?
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
 }

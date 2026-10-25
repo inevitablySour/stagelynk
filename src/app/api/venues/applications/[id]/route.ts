@@ -3,7 +3,7 @@ import { z } from "zod/v4";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
-import { reserveOpenCall, chargeReservedCall, cancelReservedCall } from "@/lib/open-call-payments";
+import { reserveOpenCall, chargeReservedCall, cancelReservedCall, confirmMilestoneCall } from "@/lib/open-call-payments";
 import { writeAuditLog } from "@/lib/audit-log";
 import { getLogger } from "@/lib/logger";
 
@@ -13,7 +13,7 @@ const decisionSchema = z.object({
   expectedFee: z.number().finite().positive().optional(),
   paymentReviewed: z.boolean().optional(),
   expectedPaymentMethodId: z.string().optional(),
-  expectedTotal: z.number().finite().positive().optional(),
+  expectedTotal: z.number().finite().min(0).optional(),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -42,6 +42,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (parsed.data.expectedPaymentMethodId !== paymentMethodId) return NextResponse.json({ success: false, message: "Your default card changed. Review payment again." }, { status: 409 });
       const reservation = await reserveOpenCall(id, venue.id, parsed.data.expectedFee, venue.stripeCustomerId, paymentMethodId);
       if (parsed.data.expectedTotal !== reservation.booking.totalChargeAmount) return NextResponse.json({ success: false, message: "The charge total changed. Review payment again before confirming." }, { status: 409 });
+      if (reservation.booking.paymentStructure === "milestone") {
+        const booking = await confirmMilestoneCall(reservation.booking.id);
+        await writeAuditLog({ event: "job_application_accept", category: "booking", level: "info", actorUserId: session.user.id, targetType: "Booking", targetId: booking.id });
+        return NextResponse.json({ success: true, data: { booking } });
+      }
       const result = await chargeReservedCall(reservation.booking, reservation.attempt);
       if (!result.confirmed) return NextResponse.json({ success: false, ...result }, { status: 402 });
       await writeAuditLog({ event: "job_application_accept", category: "booking", level: "info", actorUserId: session.user.id, targetType: "Booking", targetId: result.booking.id });

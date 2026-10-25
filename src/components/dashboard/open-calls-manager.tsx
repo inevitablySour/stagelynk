@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { OpenCallEditor } from "@/components/dashboard/open-call-editor";
 import { TechnicalGapAlert } from "@/components/equipment/technical-gap-alert";
 import { calculateMarketplaceFees, formatMoney } from "@/lib/marketplace-fees";
+import { PAYMENT_STRUCTURE_LABELS, planPayment } from "@/lib/payment-structures";
+import type { PaymentStructure } from "@prisma/client";
 import { getStripeClient } from "@/lib/stripe-client";
 import type { OpenCallRow } from "@/lib/open-calls";
 import type { ApplicationFitScore } from "@/lib/application-fit";
@@ -20,6 +22,15 @@ interface Applicant {
   musician: { id: string; stageName: string; location: string };
   slot: { id: string; label: string } | null; fit: ApplicationFitScore; technicalGaps: TechnicalGap[];
   booking: { paymentStatus: string; status: string } | null;
+  selectedPaymentStructure?: PaymentStructure;
+  proposedMilestones?: { label: string; amount: number }[] | null;
+}
+
+/** What the venue is charged right now, given the structure the artist picked. */
+function chargeNow(app: Applicant, call: OpenCallRow) {
+  const structure = app.selectedPaymentStructure ?? "full_sum";
+  const plan = planPayment({ structure, fee: app.agreedFee, currency: call.currency, depositPercent: call.depositPercent });
+  return { structure, plan, fees: plan.first ?? calculateMarketplaceFees(0, { currency: call.currency, passProcessorFeeToVenue: false }) };
 }
 interface Review { app: Applicant; call: OpenCallRow; card: { id: string; brand: string; last4: string } | null }
 
@@ -67,7 +78,7 @@ export function OpenCallsManager({ listings }: { listings: OpenCallRow[] }) {
     try {
       const send = () => fetch(`/api/venues/applications/${app.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, expectedFee: app.agreedFee, expectedTotal: calculateMarketplaceFees(app.agreedFee, { currency: call.currency }).totalChargeAmount, paymentReviewed: decision === "accept", expectedPaymentMethodId: cardId }),
+        body: JSON.stringify({ decision, expectedFee: app.agreedFee, expectedTotal: chargeNow(app, call).fees.totalChargeAmount, paymentReviewed: decision === "accept", expectedPaymentMethodId: cardId }),
       }).then((response) => response.json());
       let json = await send();
       if (json.requiresAction && json.clientSecret) {
@@ -89,7 +100,7 @@ export function OpenCallsManager({ listings }: { listings: OpenCallRow[] }) {
     {editing && <OpenCallEditor key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} copy={editing !== "new" && editing.applicantCount > 0} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); router.refresh(); }} />}
     {error && <p role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
     {review && <Card className="mb-6 border-brand/40"><CardHeader><CardTitle>Review & confirm booking</CardTitle><p className="text-sm text-muted">{review.app.musician.stageName} · {review.call.title} · {review.app.slot?.label}</p></CardHeader><CardContent className="space-y-4">
-      <dl className="space-y-2 text-sm">{(() => { const fees = calculateMarketplaceFees(review.app.agreedFee, { currency: review.call.currency }); return <><div className="flex justify-between gap-4"><dt>Artist receives</dt><dd>{formatMoney(fees.performanceFee, fees.currency)}</dd></div><div className="flex justify-between gap-4"><dt>Platform fee (5%)</dt><dd>{formatMoney(fees.platformFeeAmount, fees.currency)}</dd></div><div className="flex justify-between gap-4"><dt>Processing estimate</dt><dd>{formatMoney(fees.processorFeeEstimate, fees.currency)}</dd></div><div className="flex justify-between gap-4 border-t border-line pt-3 font-semibold"><dt>Total charged now</dt><dd>{formatMoney(fees.totalChargeAmount, fees.currency)}</dd></div></>; })()}</dl>
+      <dl className="space-y-2 text-sm">{(() => { const { structure, plan, fees } = chargeNow(review.app, review.call); return <><div className="flex justify-between gap-4"><dt>Payment structure</dt><dd>{PAYMENT_STRUCTURE_LABELS[structure]}</dd></div>{structure === "deposit_balance" && <div className="flex justify-between gap-4 text-muted"><dt>Balance, charged ~48h before the event</dt><dd>{formatMoney(plan.balanceFee, fees.currency)} + fees</dd></div>}{structure === "milestone" && <div className="text-muted">Nothing is charged now. Each of the {review.app.proposedMilestones?.length ?? 0} milestones is charged when you approve it.</div>}<div className="flex justify-between gap-4"><dt>Artist receives</dt><dd>{formatMoney(fees.performanceFee, fees.currency)}</dd></div><div className="flex justify-between gap-4"><dt>Platform fee (5%)</dt><dd>{formatMoney(fees.platformFeeAmount, fees.currency)}</dd></div><div className="flex justify-between gap-4"><dt>Processing estimate</dt><dd>{formatMoney(fees.processorFeeEstimate, fees.currency)}</dd></div><div className="flex justify-between gap-4 border-t border-line pt-3 font-semibold"><dt>Total charged now</dt><dd>{formatMoney(fees.totalChargeAmount, fees.currency)}</dd></div></>; })()}</dl>
       <p className="text-sm text-muted">{review.card ? `Default card: ${review.card.brand} ending ${review.card.last4}.` : "Add and select a default card before confirming."} <Link href="/venue/payment-methods" className="font-semibold text-brand underline">Payment methods</Link></p>
       <p className="text-xs leading-6 text-muted">Your saved card is charged now. The artist&apos;s payment stays on the platform until payout eligibility. The slot becomes booked only after successful payment. An unfinished payment reserves the slot for up to 30 minutes, bounded by the application deadline and event start.</p>
       <div className="flex flex-wrap gap-3"><Button disabled={busy || !review.card} onClick={() => decide(review.app, review.call, "accept", review.card?.id)}>{busy ? "Processing…" : "Pay & confirm booking"}</Button><Button variant="outline" disabled={busy} onClick={() => setReview(null)}>Back</Button></div>

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { BookingPaymentStep } from "@/components/artists/booking-payment-step";
-import { calculateMarketplaceFees, formatMoney } from "@/lib/marketplace-fees";
+import { formatMoney } from "@/lib/marketplace-fees";
+import { planPayment, DEFAULT_DEPOSIT_PERCENT } from "@/lib/payment-structures";
 import { APP_NAME } from "@/config";
 
 interface BookingRequestFormProps {
@@ -23,6 +24,7 @@ export function BookingRequestForm({ musicianId, stageName }: BookingRequestForm
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [fee, setFee] = useState("");
+  const [useDeposit, setUseDeposit] = useState(false);
   const [venueAddress, setVenueAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -31,7 +33,8 @@ export function BookingRequestForm({ musicianId, stageName }: BookingRequestForm
 
   const feeNumber = Number(fee);
   const hasValidFee = fee.length > 0 && Number.isFinite(feeNumber) && feeNumber > 0;
-  const breakdown = hasValidFee ? calculateMarketplaceFees(feeNumber) : null;
+  const plan = hasValidFee ? planPayment({ structure: useDeposit ? "deposit_balance" : "full_sum", fee: feeNumber, currency: "EUR", depositPercent: DEFAULT_DEPOSIT_PERCENT }) : null;
+  const breakdown = plan?.first ?? null;
 
   async function handleContinueToPayment() {
     setError(null);
@@ -71,6 +74,8 @@ export function BookingRequestForm({ musicianId, stageName }: BookingRequestForm
           venueAddress: venueAddress || undefined,
           notes: notes || undefined,
           fee: feeNumber,
+          paymentStructure: useDeposit ? "deposit_balance" : "full_sum",
+          depositPercent: DEFAULT_DEPOSIT_PERCENT,
           paymentMethodId,
         }),
       });
@@ -139,6 +144,10 @@ export function BookingRequestForm({ musicianId, stageName }: BookingRequestForm
               <p className="mt-1 text-xs text-stone-400">
                 This is what {stageName} will receive. Platform and processing fees are added on top and paid by you.
               </p>
+              <label className="mt-3 flex items-start gap-2 text-sm text-stone-700">
+                <input type="checkbox" className="mt-1" checked={useDeposit} onChange={(e) => setUseDeposit(e.target.checked)} />
+                <span>Pay a {DEFAULT_DEPOSIT_PERCENT}% deposit now and the balance about 48 hours before the event.</span>
+              </label>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-stone-700">Notes (optional)</label>
@@ -168,8 +177,14 @@ export function BookingRequestForm({ musicianId, stageName }: BookingRequestForm
                 <dd className="text-stone-700">{formatMoney(breakdown.processorFeeEstimate, breakdown.currency)}</dd>
               </div>
               <hr className="border-line" />
+              {plan && plan.balanceFee > 0 && (
+                <div className="flex justify-between text-stone-500">
+                  <dt>Balance, charged ~48h before the event</dt>
+                  <dd>{formatMoney(plan.balanceFee, "EUR")} + fees</dd>
+                </div>
+              )}
               <div className="flex justify-between">
-                <dt className="font-semibold text-stone-900">Total hold on your card</dt>
+                <dt className="font-semibold text-stone-900">{useDeposit ? "Deposit hold on your card" : "Total hold on your card"}</dt>
                 <dd className="font-bold text-stone-900">{formatMoney(breakdown.totalChargeAmount, breakdown.currency)}</dd>
               </div>
             </dl>

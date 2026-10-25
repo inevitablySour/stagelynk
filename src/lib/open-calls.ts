@@ -33,6 +33,7 @@ export function serializeCall(
     budgetMin: suppress ? 0 : listing.budgetMin, budgetMax: suppress ? 0 : listing.budgetMax,
     hideBudget: listing.hideBudget, currency: listing.currency,
     genres: Array.isArray(listing.genres) ? listing.genres as string[] : [],
+    offeredPaymentStructures: listing.offeredPaymentStructures, depositPercent: listing.depositPercent,
     stageSpecs: listing.stageSpecs, useVenueEquipment: listing.useVenueEquipment,
     eventEquipment: Array.isArray(listing.eventEquipment) ? listing.eventEquipment as { equipmentId: string; quantity: number }[] : [],
     requiredServices: Array.isArray(listing.requiredServices) ? listing.requiredServices as string[] : [],

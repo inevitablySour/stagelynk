@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { HierarchicalPicker } from "@/components/common/hierarchical-picker";
+import { OfferedStructuresField } from "@/components/payments/payment-structure-fields";
+import type { PaymentStructure } from "@prisma/client";
 import { EquipmentPickerDialog, EquipmentSummary } from "@/components/equipment/equipment-picker-dialog";
 import { GENRE_GROUPS } from "@/config";
 import type { OpenCallRow } from "@/lib/open-calls";
@@ -26,6 +28,8 @@ export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { i
   const [equipment, setEquipment] = useState(initial?.eventEquipment ?? []);
   const [catalog, setCatalog] = useState<EquipmentItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [structures, setStructures] = useState<PaymentStructure[]>(initial?.offeredPaymentStructures ?? ["full_sum"]);
+  const [depositPercent, setDepositPercent] = useState(initial?.depositPercent ?? 30);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -52,6 +56,7 @@ export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { i
           externalVenueName: text("externalVenueName"), stageSpecs: text("stageSpecs"),
           budgetMin: Number(text("budgetMin")), budgetMax: Number(text("budgetMax")), currency: "EUR",
           applicationDeadline, genres, useVenueEquipment, eventEquipment: equipment,
+          offeredPaymentStructures: structures, depositPercent,
           equipmentProvided: equipment.map((item) => `${item.quantity}× ${catalog.find((entry) => entry.id === item.equipmentId)?.name ?? "Equipment"}`),
           requiredServices: text("requiredServices").split(",").map((item) => item.trim()).filter(Boolean),
           slots: slots.map((slot) => ({ label: slot.label, budgetMin: slot.budgetMin === "" ? null : Number(slot.budgetMin), budgetMax: slot.budgetMax === "" ? null : Number(slot.budgetMax) })),
@@ -104,6 +109,7 @@ export function OpenCallEditor({ initial, copy = false, onSaved, onCancel }: { i
       <fieldset className="space-y-3"><legend className="mb-2 text-sm font-medium">Lineup slots</legend><p className="text-xs text-muted">One artist per slot. Optional slot budgets override the call&apos;s range; fill both limits or neither.</p>{slots.map((slot, index) => <div key={index} className="grid gap-2 rounded-xl border border-line p-3 sm:grid-cols-[1fr_110px_110px_auto]"><Input aria-label={`Slot ${index + 1} label`} value={slot.label} onChange={(event) => setSlots((previous) => previous.map((item, position) => position === index ? { ...item, label: event.target.value } : item))} placeholder="Opener / Support / Co-headliner" />{(["budgetMin", "budgetMax"] as const).map((key) => <Input key={key} aria-label={`Slot ${index + 1} ${key}`} type="number" min={0} step="0.01" placeholder={key === "budgetMin" ? "Min EUR" : "Max EUR"} value={slot[key]} onChange={(event) => setSlots((previous) => previous.map((item, position) => position === index ? { ...item, [key]: event.target.value } : item))} />)}<Button type="button" variant="ghost" disabled={slots.length === 1} onClick={() => setSlots((previous) => previous.filter((_, position) => position !== index))}>Remove</Button></div>)}<Button type="button" variant="outline" disabled={slots.length >= 20} onClick={() => setSlots((previous) => [...previous, { label: "", budgetMin: "", budgetMax: "" }])}>Add lineup slot</Button></fieldset>
       <div><label htmlFor="call-stageSpecs" className="mb-2 block text-sm font-medium">Stage setup & technical specifications</label><textarea id="call-stageSpecs" name="stageSpecs" defaultValue={initial?.stageSpecs} maxLength={3000} className="min-h-24 w-full rounded-xl border border-line bg-surface p-3 text-sm" placeholder="Stage dimensions, power, access, soundcheck, limits…" /></div>
       {field("requiredServices", "Required services (comma-separated)", initial?.requiredServices.join(", "))}
+      <OfferedStructuresField value={structures} onChange={setStructures} depositPercent={depositPercent} onDepositPercentChange={setDepositPercent} />
       <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={useVenueEquipment} onChange={(event) => setUseVenueEquipment(event.target.checked)} />Use my venue&apos;s current in-house equipment for technical matching</label>
       {!useVenueEquipment && (
         <fieldset className="rounded-2xl border border-line p-4">

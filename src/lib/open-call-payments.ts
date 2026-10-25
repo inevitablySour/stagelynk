@@ -7,6 +7,7 @@ import { hasArtistConflict } from "@/lib/artist-conflicts";
 import { sendJobApplicationStatusEmail } from "@/lib/email-templates";
 import { getLogger } from "@/lib/logger";
 import { recordVenueCard } from "@/lib/p2p-policy";
+import { planPayment, balanceDueAt, firstChargeFee, type MilestoneInput } from "@/lib/payment-structures";
 
 const log = getLogger("open-call-payments");
 
@@ -37,8 +38,16 @@ export async function reserveOpenCall(applicationId: string, venueId: string, ex
     await tx.$queryRaw`SELECT "id" FROM "MusicianProfile" WHERE "id" = ${application.musicianId} FOR UPDATE`;
     if (await hasArtistConflict(tx, application.musicianId, listing.eventStartsAt, listing.eventEndsAt, application.booking?.id)) throw new Error("The artist has a conflicting booking or pending payment.");
     if (resuming) return { booking: application.booking!, attempt: application.paymentAttempt };
-    const fees = calculateMarketplaceFees(fee, { currency: listing.currency });
+    // Booking amount fields describe the FIRST charge (see schema comment on
+    // Booking.paymentStructure): everything for full_sum, the deposit for
+    // deposit_balance, nothing for milestone.
+    const structure = application.selectedPaymentStructure;
+    const plan = planPayment({ structure, fee, currency: listing.currency, depositPercent: listing.depositPercent });
+    const fees = plan.first ?? calculateMarketplaceFees(0, { currency: listing.currency, passProcessorFeeToVenue: false });
     const data = {
+      paymentStructure: structure,
+      depositAmount: structure === "deposit_balance" ? plan.firstChargeFee : 0,
+      balanceDueAt: structure === "deposit_balance" ? balanceDueAt(listing.eventStartsAt) : null,
       title: listing.title, eventType: listing.eventType, eventDate: listing.eventDate,
       startTime: listing.startTime!, endTime: listing.endTime!, venueAddress: listing.venueAddress,
       setupNotes: listing.stageSpecs,
@@ -119,7 +128,8 @@ export async function confirmOpenCallPayment(bookingId: string, intent: Stripe.P
     await tx.marketplaceTransaction.create({
       data: {
         bookingId: booking.id, provider: "stripe", providerPaymentId: intent.id,
-        performanceFee: booking.fee, platformFeeRate: booking.platformFeeRate,
+        transactionType: booking.paymentStructure === "deposit_balance" ? "deposit" : "full",
+        performanceFee: firstChargeFee(booking), platformFeeRate: booking.platformFeeRate,
         platformFeeAmount: booking.platformFeeAmount, processorFeeEstimate: booking.processorFeeEstimate,
         totalChargeAmount: booking.totalChargeAmount, artistPayoutAmount: booking.netPayoutAmount,
         currency: booking.currency, status: "paid", paidAt: new Date(),
@@ -211,11 +221,50 @@ async function releaseCallReservation(bookingId: string, paymentStatus: "cancell
     if (updated.count && paymentStatus === "refunded" && !await tx.marketplaceTransaction.findFirst({ where: { bookingId, providerPaymentId: expectedIntentId } })) await tx.marketplaceTransaction.create({
       data: {
         bookingId, provider: "stripe", providerPaymentId: expectedIntentId,
-        performanceFee: booking.fee, platformFeeRate: booking.platformFeeRate,
+        transactionType: booking.paymentStructure === "deposit_balance" ? "deposit" : "full",
+        performanceFee: firstChargeFee(booking), platformFeeRate: booking.platformFeeRate,
         platformFeeAmount: booking.platformFeeAmount, processorFeeEstimate: booking.processorFeeEstimate,
         totalChargeAmount: booking.totalChargeAmount, artistPayoutAmount: booking.netPayoutAmount,
         currency: booking.currency, status: "refunded", refundedAt: new Date(),
       },
     });
   });
+}
+
+/**
+ * Milestone bookings charge nothing when the venue hires: the slot is
+ * confirmed immediately and each milestone is charged when the venue
+ * approves it (see api/bookings/[id]/milestones).
+ */
+export async function confirmMilestoneCall(bookingId: string) {
+  const result = await prisma.$transaction(async (tx) => {
+    const original = await tx.booking.findUniqueOrThrow({ where: { id: bookingId } });
+    if (!original.jobApplicationId || original.paymentStructure !== "milestone") throw new Error("Not a milestone booking.");
+    const application = await tx.jobApplication.findUniqueOrThrow({ where: { id: original.jobApplicationId } });
+    await tx.$queryRaw`SELECT "id" FROM "JobListing" WHERE "id" = ${application.jobListingId} FOR UPDATE`;
+    const booking = await tx.booking.findUniqueOrThrow({ where: { id: bookingId } });
+    if (booking.status === "accepted") return { booking, newlyConfirmed: false };
+    if (booking.status !== "pending") throw new Error("This booking is no longer awaiting confirmation.");
+    const milestones = Array.isArray(application.proposedMilestones) ? application.proposedMilestones as MilestoneInput[] : [];
+    if (milestones.length < 2) throw new Error("This application has no milestone plan.");
+    const reserved = await tx.jobListingSlot.updateMany({
+      where: { id: application.slotId ?? "", reservedByApplicationId: application.id, filled: false },
+      data: { filled: true },
+    });
+    if (reserved.count !== 1) throw new Error("The slot reservation is missing.");
+    await tx.jobApplication.update({ where: { id: application.id }, data: { status: "accepted" } });
+    await tx.bookingMilestone.createMany({ data: milestones.map((m, order) => ({ bookingId, label: m.label, amount: m.amount, order })) });
+    const updated = await tx.booking.update({ where: { id: bookingId }, data: { status: "accepted", paymentStatus: "authorized", responseDeadline: null } });
+    if (await tx.jobListingSlot.count({ where: { jobListingId: application.jobListingId, filled: false } }) === 0) {
+      await tx.jobListing.update({ where: { id: application.jobListingId }, data: { status: "filled" } });
+    }
+    return { booking: updated, newlyConfirmed: true };
+  });
+  if (result.newlyConfirmed) {
+    const booking = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId }, include: { musician: { include: { user: true } }, venue: true } });
+    sendJobApplicationStatusEmail({ email: booking.musician.user.email, name: booking.musician.stageName }, {
+      jobTitle: booking.title, venueName: booking.venue.venueName, status: "accepted",
+    }).catch((error) => log.error({ err: error }, "Application confirmation email failed"));
+  }
+  return result.booking;
 }

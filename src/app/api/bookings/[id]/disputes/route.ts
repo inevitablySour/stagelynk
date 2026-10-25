@@ -58,7 +58,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (booking.status !== "accepted" && booking.status !== "completed") {
     return NextResponse.json({ success: false, message: "Only accepted or completed bookings can be disputed." }, { status: 400 });
   }
-  if (booking.paymentStatus !== "paid") {
+  const hasPayment = booking.paymentStatus === "paid"
+    || (booking.paymentStructure === "milestone" && await prisma.marketplaceTransaction.count({ where: { bookingId: id, status: "paid" } }) > 0);
+  if (!hasPayment) {
     return NextResponse.json({ success: false, message: "This booking has no payment to dispute." }, { status: 400 });
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import type { PaymentStructure } from "@prisma/client";
 import { useState } from "react";
 import Link from "next/link";
 import { MapPin, Calendar, Users, Sparkles, Search, ArrowUpRight, Briefcase } from "lucide-react";
@@ -37,6 +38,8 @@ export interface PublicJobListing {
   equipmentProvided?: string[];
   useVenueEquipment?: boolean;
   requiredServices?: string[];
+  offeredPaymentStructures?: PaymentStructure[];
+  depositPercent?: number;
   technicalGaps?: TechnicalGap[];
   fit?: ApplicationFitScore;
 }

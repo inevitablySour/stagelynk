@@ -1,9 +1,18 @@
 import { z } from "zod/v4";
 import { calendarDate, normalizeTags } from "@/lib/discovery-utils";
+import { PAYMENT_STRUCTURES } from "@/lib/payment-structures";
 
 const money = z.number().finite().min(0).max(1000000).multipleOf(0.01);
 const tags = z.array(z.string().trim().min(1).max(80)).max(20).transform(normalizeTags);
 const optionalUrl = z.union([z.url().refine((value) => /^https?:\/\//i.test(value), "Use an HTTP(S) URL"), z.literal("")]).optional();
+const paymentStructure = z.enum(PAYMENT_STRUCTURES);
+const offeredPaymentStructures = z.array(paymentStructure).min(1, "Offer at least one payment structure").max(3).transform((items) => [...new Set(items)]);
+const depositPercent = z.number().int().min(10).max(90);
+export const milestoneInputSchema = z.object({
+  label: z.string().trim().min(1, "Name every milestone").max(120),
+  amount: money.refine((value) => value > 0, "Milestone amounts must be positive"),
+});
+const milestoneList = z.array(milestoneInputSchema).min(2, "Add at least two milestones").max(12);
 const timeOfDay = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 
 export const loginSchema = z.object({
@@ -37,6 +46,8 @@ export const jobListingSchema = z.object({
   genres: tags.optional(),
   requiredServices: z.array(z.string().trim().min(1).max(160)).max(30).optional(),
   equipmentProvided: z.array(z.string().trim().min(1).max(200)).max(100).optional(),
+  offeredPaymentStructures: offeredPaymentStructures.optional(),
+  depositPercent: depositPercent.optional(),
   applicationDeadline: z.union([z.iso.datetime({ offset: true }), z.literal("")]).optional(),
   status: z.enum(["draft", "published", "paused", "closed", "filled", "expired"]).optional(),
   slotLabels: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
@@ -59,6 +70,8 @@ export const jobApplicationSchema = z.object({
   availabilityNotes: z.string().max(1500).optional(),
   slotId: z.string().optional(),
   availabilityConfirmed: z.literal(true, { message: "Confirm you are available for this slot" }),
+  selectedPaymentStructure: paymentStructure.optional(),
+  milestones: milestoneList.optional(),
 });
 
 export const promotionCampaignSchema = z.object({
@@ -159,6 +172,8 @@ export const bookingRequestSchema = z.object({
   fee: z.number().min(0),
   currency: z.string().length(3).optional(),
   depositAmount: z.number().min(0).optional(),
+  paymentStructure: z.enum(["full_sum", "deposit_balance"]).optional(),
+  depositPercent: depositPercent.optional(),
   cancellationPolicy: z.string().max(2000).optional(),
   paymentMethodId: z.string().min(1, "A saved payment method is required"),
 });
@@ -198,12 +213,16 @@ export const projectListingSchema = z.object({
   categories: tags.optional(),
   genres: tags.optional(),
   requiredServices: z.array(z.string().trim().min(1).max(160)).max(30).optional(),
+  offeredPaymentStructures: offeredPaymentStructures.optional(),
+  depositPercent: depositPercent.optional(),
   status: z.enum(["draft", "published", "paused", "closed", "filled", "expired"]).optional(),
 });
 
 export const projectApplicationSchema = z.object({
   coverMessage: z.string().trim().max(2000).optional(),
   proposedFee: money.optional(),
+  selectedPaymentStructure: paymentStructure.optional(),
+  milestones: milestoneList.optional(),
 });
 
 export type JobListingInput = z.infer<typeof jobListingSchema>;

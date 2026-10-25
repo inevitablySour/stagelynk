@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/lib/marketplace-fees";
+import { ApplicantPaymentField, emptyMilestones, type MilestoneDraft } from "@/components/payments/payment-structure-fields";
+import type { PaymentStructure } from "@prisma/client";
 
 interface ProjectRow {
   id: string;
@@ -20,17 +22,29 @@ interface ProjectRow {
   currency: string;
   genres: string[];
   applicantCount: number;
+  offeredPaymentStructures: PaymentStructure[];
+  depositPercent: number;
 }
 
 export function MusicianProjectsBrowser({ projects }: { projects: ProjectRow[] }) {
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [coverMessage, setCoverMessage] = useState("");
   const [proposedFee, setProposedFee] = useState("");
+  const [structure, setStructure] = useState<PaymentStructure>("full_sum");
+  const [milestones, setMilestones] = useState<MilestoneDraft[]>(emptyMilestones());
   const [busy, setBusy] = useState(false);
   const [doneIds, setDoneIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (id: string) => {
+    if (structure === "milestone") {
+      const parsed = milestones.map((m) => ({ label: m.label.trim(), amount: Number(m.amount) }));
+      const sum = Math.round(parsed.reduce((total, m) => total + m.amount, 0) * 100) / 100;
+      if (!proposedFee || parsed.some((m) => !m.label || !(m.amount > 0)) || Math.abs(sum - Number(proposedFee)) > 0.005) {
+        setError("Enter your fee, name every milestone, and make the amounts add up to it.");
+        return;
+      }
+    }
     setBusy(true);
     setError(null);
     try {
@@ -40,6 +54,8 @@ export function MusicianProjectsBrowser({ projects }: { projects: ProjectRow[] }
         body: JSON.stringify({
           coverMessage: coverMessage.trim() || undefined,
           proposedFee: proposedFee ? Number(proposedFee) : undefined,
+          selectedPaymentStructure: structure,
+          milestones: structure === "milestone" ? milestones.map((m) => ({ label: m.label.trim(), amount: Number(m.amount) })) : undefined,
         }),
       });
       const json = await res.json();
@@ -108,6 +124,7 @@ export function MusicianProjectsBrowser({ projects }: { projects: ProjectRow[] }
                   onChange={(e) => setCoverMessage(e.target.value)}
                 />
                 <Input type="number" placeholder="Your proposed fee (optional)" value={proposedFee} onChange={(e) => setProposedFee(e.target.value)} />
+                <ApplicantPaymentField offered={p.offeredPaymentStructures} selected={structure} onSelect={setStructure} fee={Number(proposedFee) || 0} milestones={milestones} onMilestones={setMilestones} depositPercent={p.depositPercent} />
                 {error && <p className="text-sm text-red-600">{error}</p>}
                 <div className="flex gap-2">
                   <Button size="sm" variant="ghost" onClick={() => setApplyingId(null)} disabled={busy}>
@@ -119,7 +136,7 @@ export function MusicianProjectsBrowser({ projects }: { projects: ProjectRow[] }
                 </div>
               </div>
             ) : (
-              <Button size="sm" className="mt-4" onClick={() => setApplyingId(p.id)}>
+              <Button size="sm" className="mt-4" onClick={() => { setApplyingId(p.id); setStructure(p.offeredPaymentStructures[0] ?? "full_sum"); setMilestones(emptyMilestones()); }}>
                 Apply
               </Button>
             )}

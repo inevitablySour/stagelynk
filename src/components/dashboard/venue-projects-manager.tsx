@@ -1,5 +1,8 @@
 "use client";
 
+import { PAYMENT_STRUCTURE_LABELS } from "@/lib/payment-structures";
+import { OfferedStructuresField } from "@/components/payments/payment-structure-fields";
+import type { PaymentStructure } from "@prisma/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Calendar, DollarSign, Users } from "lucide-react";
@@ -26,6 +29,8 @@ interface ApplicantRow {
   id: string;
   coverMessage: string;
   proposedFee: number | null;
+  selectedPaymentStructure?: PaymentStructure;
+  proposedMilestones?: { label: string; amount: number }[] | null;
   status: JobApplicationStatus;
   musician: { id: string; stageName: string; location: string; rating: number; reviewCount: number };
   booking: { paymentStatus: string; status: string } | null;
@@ -47,6 +52,8 @@ export function VenueProjectsManager({ listings }: { listings: ProjectListingRow
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [hideBudget, setHideBudget] = useState(false);
+  const [structures, setStructures] = useState<PaymentStructure[]>(["full_sum"]);
+  const [depositPercent, setDepositPercent] = useState(30);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -73,6 +80,8 @@ export function VenueProjectsManager({ listings }: { listings: ProjectListingRow
           budgetMin: budgetMin ? Number(budgetMin) : undefined,
           budgetMax: budgetMax ? Number(budgetMax) : undefined,
           hideBudget,
+          offeredPaymentStructures: structures,
+          depositPercent,
           status: "draft",
         }),
       });
@@ -172,6 +181,7 @@ export function VenueProjectsManager({ listings }: { listings: ProjectListingRow
               <input type="checkbox" checked={hideBudget} onChange={(e) => setHideBudget(e.target.checked)} className="h-4 w-4 rounded border-stone-300 text-olive-600 focus:ring-olive-500" />
               Hide this budget range from applicants
             </label>
+            <OfferedStructuresField value={structures} onChange={setStructures} depositPercent={depositPercent} onDepositPercentChange={setDepositPercent} />
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex gap-2">
               <Button size="sm" onClick={handleCreate} disabled={submitting}>
@@ -244,6 +254,7 @@ export function VenueProjectsManager({ listings }: { listings: ProjectListingRow
                       </div>
                       {a.coverMessage && <p className="mt-2 text-sm text-stone-600">{a.coverMessage}</p>}
                       {a.proposedFee != null && <p className="mt-1 text-sm font-medium text-stone-900">Proposed: {formatMoney(a.proposedFee)}</p>}
+                      {a.selectedPaymentStructure && a.selectedPaymentStructure !== "full_sum" && <p className="mt-1 text-xs text-stone-600">Payment: {PAYMENT_STRUCTURE_LABELS[a.selectedPaymentStructure]}{a.selectedPaymentStructure === "milestone" && a.proposedMilestones ? ` (${a.proposedMilestones.map((m) => `${m.label} ${formatMoney(m.amount)}`).join(", ")})` : ""}</p>}
                       {a.status === "submitted" && (
                         <div className="mt-2 flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => decide(a.id, "decline")} disabled={busyId === a.id}>

@@ -7,6 +7,7 @@ import { calculateMarketplaceFees } from "@/lib/marketplace-fees";
 import { writeAuditLog } from "@/lib/audit-log";
 import { getLogger } from "@/lib/logger";
 import { recordVenueCard } from "@/lib/p2p-policy";
+import { planPayment, balanceDueAt, type MilestoneInput } from "@/lib/payment-structures";
 
 const log = getLogger("api-venues-project-applications");
 
@@ -62,15 +63,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (fee <= 0) {
     return NextResponse.json({ success: false, message: "No agreed fee for this application. Have the artist propose one." }, { status: 400 });
   }
-  const fees = calculateMarketplaceFees(fee, { currency: application.projectListing.currency });
+  const structure = application.selectedPaymentStructure;
+  const milestones = Array.isArray(application.proposedMilestones) ? application.proposedMilestones as MilestoneInput[] : [];
+  if (structure === "milestone" && milestones.length < 2) {
+    return NextResponse.json({ success: false, message: "This application has no milestone plan." }, { status: 400 });
+  }
+  const plan = planPayment({ structure, fee, currency: application.projectListing.currency, depositPercent: application.projectListing.depositPercent });
+  const fees = plan.first ?? calculateMarketplaceFees(0, { currency: application.projectListing.currency, passProcessorFeeToVenue: false });
 
   void recordVenueCard(venue.id, paymentMethodId);
 
   try {
-    const paymentIntent = await stripe.paymentIntents.create({
+    // Milestone projects charge nothing up front; each milestone is charged on approval.
+    const paymentIntent = structure === "milestone" ? null : await stripe.paymentIntents.create({
       amount: toMinorUnits(fees.totalChargeAmount),
       currency: application.projectListing.currency.toLowerCase(),
-      customer: venue.stripeCustomerId,
+      customer: venue.stripeCustomerId!,
       payment_method: paymentMethodId,
       automatic_payment_methods: { enabled: true, allow_redirects: "never" },
       confirm: true,
@@ -78,7 +86,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       metadata: { projectApplicationId: application.id, source: "project_application" },
     });
 
-    if (paymentIntent.status !== "succeeded") {
+    if (paymentIntent && paymentIntent.status !== "succeeded") {
       return NextResponse.json({ success: false, message: "The charge requires further authentication. Ask the client to try again from their bank's app, or use a different card." }, { status: 402 });
     }
 
@@ -97,6 +105,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           startTime: "00:00",
           endTime: "00:00",
           fee,
+          paymentStructure: structure,
+          depositAmount: structure === "deposit_balance" ? plan.firstChargeFee : 0,
+          balanceDueAt: structure === "deposit_balance" ? balanceDueAt(deadlineDate) : null,
           currency: application.projectListing.currency,
           platformFeeRate: fees.platformFeeRate,
           platformFeeAmount: fees.platformFeeAmount,
@@ -105,21 +116,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           netPayoutAmount: fees.artistPayoutAmount,
           stripeCustomerId: venue.stripeCustomerId,
           stripePaymentMethodId: paymentMethodId,
-          stripePaymentIntentId: paymentIntent.id,
+          stripePaymentIntentId: paymentIntent?.id ?? null,
           status: "accepted",
-          paymentStatus: "paid",
+          paymentStatus: structure === "milestone" ? "authorized" : "paid",
           source: "project_application",
           payoutReleaseAt: new Date(deadlineDate.getTime() + 86400000),
         },
       });
       await tx.projectApplication.update({ where: { id: application.id }, data: { status: "accepted" } });
       await tx.projectListing.update({ where: { id: application.projectListingId }, data: { status: "filled" } });
-      await tx.marketplaceTransaction.create({
+      if (structure === "milestone") {
+        await tx.bookingMilestone.createMany({ data: milestones.map((m, order) => ({ bookingId: booking.id, label: m.label, amount: m.amount, order })) });
+      }
+      if (paymentIntent) await tx.marketplaceTransaction.create({
         data: {
           bookingId: booking.id,
           provider: "stripe",
           providerPaymentId: paymentIntent.id,
-          performanceFee: fee,
+          transactionType: structure === "deposit_balance" ? "deposit" : "full",
+          performanceFee: plan.firstChargeFee,
           platformFeeRate: fees.platformFeeRate,
           platformFeeAmount: fees.platformFeeAmount,
           processorFeeEstimate: fees.processorFeeEstimate,

@@ -57,3 +57,27 @@ export async function refundCharge(paymentIntentId: string, amount?: number) {
     ...(amount !== undefined ? { amount: toMinorUnits(amount) } : {}),
   });
 }
+
+/**
+ * Refunds a booking across every charge it was paid with (a deposit_balance
+ * booking has two; a milestone booking has one per paid milestone). A full
+ * refund returns every charge; a partial refund is taken from the most
+ * recent charge first, spilling into earlier ones.
+ */
+export async function refundBookingPayments(
+  charges: { providerPaymentId: string | null; totalChargeAmount: number }[],
+  amount?: number
+) {
+  const paid = charges.filter((c): c is { providerPaymentId: string; totalChargeAmount: number } => Boolean(c.providerPaymentId)).reverse();
+  if (amount === undefined) {
+    for (const charge of paid) await refundCharge(charge.providerPaymentId);
+    return;
+  }
+  let remaining = amount;
+  for (const charge of paid) {
+    if (remaining <= 0) break;
+    const portion = Math.min(remaining, charge.totalChargeAmount);
+    await refundCharge(charge.providerPaymentId, portion);
+    remaining = Math.round((remaining - portion) * 100) / 100;
+  }
+}

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { projectApplicationSchema } from "@/lib/validations";
 import { getLogger } from "@/lib/logger";
+import { validateApplicationPayment } from "@/lib/payment-structures";
 
 const log = getLogger("api-musicians-projects-apply");
 
@@ -35,12 +36,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ success: false, message: "You've already applied to this project." }, { status: 400 });
   }
 
+  const agreedFee = parsed.data.proposedFee ?? listing.budgetMin;
+  const payment = validateApplicationPayment(listing.offeredPaymentStructures, parsed.data, agreedFee);
+  if (!payment.ok) return NextResponse.json({ success: false, message: payment.message }, { status: 400 });
+
   const application = await prisma.projectApplication.create({
     data: {
       projectListingId: id,
       musicianId: musician.id,
       coverMessage: parsed.data.coverMessage ?? "",
       proposedFee: parsed.data.proposedFee,
+      selectedPaymentStructure: payment.structure,
+      proposedMilestones: payment.milestones ?? undefined,
     },
   });
 

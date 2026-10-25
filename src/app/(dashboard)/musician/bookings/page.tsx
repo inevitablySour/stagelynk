@@ -1,3 +1,4 @@
+import { serializePaymentPlan } from "@/lib/booking-payment-plan";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { DASHBOARD_NAV_MUSICIAN } from "@/config";
@@ -15,7 +16,7 @@ export default async function MusicianBookingsPage() {
 
   const bookings = await prisma.booking.findMany({
     where: { musicianId: musician.id },
-    include: { venue: { select: { venueName: true } } },
+    include: { venue: { select: { venueName: true } }, milestones: { orderBy: { order: "asc" } } },
     orderBy: { eventDate: "desc" },
   });
 
@@ -58,6 +59,7 @@ export default async function MusicianBookingsPage() {
               negotiationStatus: b.negotiationStatus,
               proposedFee: b.proposedFee,
               proposedByUserId: b.proposedByUserId,
+              plan: serializePaymentPlan(b),
               responseDeadline: b.responseDeadline?.toISOString() ?? null,
             }))}
           />

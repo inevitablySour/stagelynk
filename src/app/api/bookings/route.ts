@@ -10,6 +10,7 @@ import { sendBookingRequestEmail } from "@/lib/email-templates";
 import { getRequestMetadata } from "@/lib/request-context";
 import { getLogger } from "@/lib/logger";
 import { recordVenueCard } from "@/lib/p2p-policy";
+import { planPayment, DEFAULT_DEPOSIT_PERCENT } from "@/lib/payment-structures";
 
 const log = getLogger("api-bookings-post");
 const NEGOTIATION_RESPONSE_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -91,7 +92,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const fees = calculateMarketplaceFees(parsed.data.fee, { currency: parsed.data.currency });
+  // Direct hires default to the full sum; the venue may propose a deposit with
+  // the balance charged about 48 hours before the event.
+  const paymentStructure = parsed.data.paymentStructure ?? "full_sum";
+  const plan = planPayment({ structure: paymentStructure, fee: parsed.data.fee, currency: parsed.data.currency ?? "EUR", depositPercent: parsed.data.depositPercent ?? DEFAULT_DEPOSIT_PERCENT });
+  const fees = plan.first ?? calculateMarketplaceFees(parsed.data.fee, { currency: parsed.data.currency });
 
   // Direct Hires place a manual-capture pre-authorization hold at request
   // time (not a charge). The artist has 48 hours to accept/decline/counter;
@@ -139,7 +144,8 @@ export async function POST(request: Request) {
       notes: parsed.data.notes,
       fee: parsed.data.fee,
       currency: parsed.data.currency ?? "EUR",
-      depositAmount: parsed.data.depositAmount ?? 0,
+      depositAmount: paymentStructure === "deposit_balance" ? plan.firstChargeFee : 0,
+      paymentStructure,
       cancellationPolicy: parsed.data.cancellationPolicy,
       platformFeeRate: fees.platformFeeRate,
       platformFeeAmount: fees.platformFeeAmount,

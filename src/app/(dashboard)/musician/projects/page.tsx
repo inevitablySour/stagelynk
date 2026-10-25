@@ -42,6 +42,8 @@ export default async function MusicianProjectsPage() {
               currency: l.currency,
               genres: Array.isArray(l.genres) ? (l.genres as string[]) : [],
               applicantCount: 0,
+              offeredPaymentStructures: l.offeredPaymentStructures,
+              depositPercent: l.depositPercent,
             }))}
           />
         </div>

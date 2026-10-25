@@ -1,5 +1,7 @@
 "use client";
 
+import { BookingPaymentPanel } from "@/components/dashboard/booking-payment-panel";
+import type { BookingPaymentPlan } from "@/lib/booking-payment-plan";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -28,6 +30,7 @@ export interface VenueBookingRow {
   audienceSize: number | null;
   negotiationStatus?: string;
   proposedFee?: number | null;
+  plan?: BookingPaymentPlan;
 }
 
 function statusVariant(s: BookingStatus) {
@@ -160,7 +163,8 @@ export function VenueBookingsManager({ bookings }: { bookings: VenueBookingRow[]
                     )}
                   </div>
                 </div>
-                {(b.status === "accepted" || b.status === "completed") && b.paymentStatus === "paid" && (
+                {b.plan && <BookingPaymentPanel bookingId={b.id} fee={b.fee} currency={b.currency} plan={b.plan} viewerRole="venue" active={b.status === "accepted" || b.status === "completed"} />}
+                {(b.status === "accepted" || b.status === "completed") && (b.paymentStatus === "paid" || b.plan?.paymentStructure === "milestone") && (
                   <DisputeBanner bookingId={b.id} viewerRole="venue" canFile />
                 )}
                 {hasCounter && (

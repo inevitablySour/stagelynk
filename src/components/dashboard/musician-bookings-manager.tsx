@@ -1,5 +1,7 @@
 "use client";
 
+import { BookingPaymentPanel } from "@/components/dashboard/booking-payment-panel";
+import type { BookingPaymentPlan } from "@/lib/booking-payment-plan";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Clock, MapPin, Users, Phone, Mail, User, ChevronDown, ChevronUp, CheckCircle2, XCircle, Mic2, Handshake } from "lucide-react";
@@ -40,6 +42,7 @@ export interface BookingRow {
   negotiationStatus?: string;
   proposedFee?: number | null;
   proposedByUserId?: string | null;
+  plan?: BookingPaymentPlan;
   responseDeadline?: string | null;
 }
 
@@ -297,7 +300,8 @@ export function MusicianBookingsManager({ bookings }: { bookings: BookingRow[] }
                       </Button>
                     </div>
                   )}
-                  {(booking.status === "accepted" || booking.status === "completed") && booking.paymentStatus === "paid" && (
+                  {booking.plan && <BookingPaymentPanel bookingId={booking.id} fee={booking.fee} currency={booking.currency} plan={booking.plan} viewerRole="musician" active={booking.status === "accepted" || booking.status === "completed"} />}
+                  {(booking.status === "accepted" || booking.status === "completed") && (booking.paymentStatus === "paid" || booking.plan?.paymentStructure === "milestone") && (
                     <DisputeBanner bookingId={booking.id} viewerRole="musician" canFile />
                   )}
                 </CardContent>

@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 10
     env:
       CRON_SECRET: ${{ secrets.MARKETPLACE_CRON_SECRET }}
-      SITE_ORIGIN: https://stagelynk.co
+      SITE_ORIGIN: https://www.indiecentral.eu
     steps:
       - name: Validate scheduler configuration
         shell: bash
@@ -47,3 +47,10 @@ jobs:
           curl --fail-with-body --silent --show-error --max-time 150 \
             --header "Authorization: Bearer $CRON_SECRET" \
             "$SITE_ORIGIN/api/cron/payout-release"
+      - name: Charge booking balances
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_ORIGIN/api/cron/balance-charges"

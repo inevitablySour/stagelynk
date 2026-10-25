@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/lib/audit-log";
 import { getRequestMetadata } from "@/lib/request-context";
 import { sendJobApplicationReceivedEmail } from "@/lib/email-templates";
 import { getLogger } from "@/lib/logger";
+import { validateApplicationPayment } from "@/lib/payment-structures";
 import { isCallOpen, effectiveBudget } from "@/lib/open-call-utils";
 import { hasArtistConflict } from "@/lib/artist-conflicts";
 
@@ -58,12 +59,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!slot || slot.filled || slot.reservedByApplicationId) throw new Error("Choose an available lineup slot.");
       const agreedFee = parsed.data.proposedFee ?? (musician.performanceFee && musician.performanceFee > 0 ? musician.performanceFee : effectiveBudget(slot, fresh).budgetMin);
       if (agreedFee <= 0) throw new Error("Review and confirm a positive artist fee before applying.");
+      const payment = validateApplicationPayment(fresh.offeredPaymentStructures, parsed.data, agreedFee);
+      if (!payment.ok) throw new Error(payment.message);
       if (await hasArtistConflict(tx, musician.id, fresh.eventStartsAt, fresh.eventEndsAt)) throw new Error("You already have a conflicting booking or pending open-call payment.");
       return tx.jobApplication.create({
         data: {
           jobListingId, musicianId: musician.id, slotId: slot.id,
           coverMessage: parsed.data.coverMessage, proposedFee: agreedFee,
           availabilityNotes: parsed.data.availabilityNotes, availabilityConfirmed: true,
+          selectedPaymentStructure: payment.structure, proposedMilestones: payment.milestones ?? undefined,
         },
       });
     });

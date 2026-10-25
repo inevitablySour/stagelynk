@@ -3,7 +3,9 @@ import { stripe, toMinorUnits } from "@/lib/stripe";
 import { writeAuditLog } from "@/lib/audit-log";
 import { sendPayoutReleasedEmail } from "@/lib/email-templates";
 import { getLogger } from "@/lib/logger";
+import { calculateMarketplaceFees } from "@/lib/marketplace-fees";
 import type { Prisma } from "@prisma/client";
+import type Stripe from "stripe";
 
 const log = getLogger("payout-release");
 
@@ -33,6 +35,12 @@ export async function releasePayoutForBooking(
   if (booking.payoutStatus !== "pending") {
     throw new PayoutReleaseError("This booking has already been paid out or is not eligible.");
   }
+  if (booking.paymentStructure === "milestone") {
+    throw new PayoutReleaseError("Milestone bookings are paid out as each milestone is approved.");
+  }
+  if (booking.paymentStructure === "deposit_balance" && (!booking.balanceChargedAt || !booking.balancePaymentIntentId)) {
+    throw new PayoutReleaseError("The balance for this booking hasn't been paid yet.");
+  }
   if (!booking.stripePaymentIntentId) {
     throw new PayoutReleaseError("No payment was recorded for this booking.");
   }
@@ -54,42 +62,54 @@ export async function releasePayoutForBooking(
     throw new PayoutReleaseError("This booking has an open dispute and cannot be paid out yet.");
   }
 
-  const paymentIntent = await stripe.paymentIntents.retrieve(booking.stripePaymentIntentId);
-  const chargeId =
-    typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : paymentIntent.latest_charge?.id;
-
-  if (!chargeId) {
-    throw new PayoutReleaseError("Unable to locate the original charge for this booking.");
+  // One transfer per charge, each drawing from its own charge via
+  // source_transaction. A deposit_balance booking has two charges.
+  const charges = [{ intentId: booking.stripePaymentIntentId, amount: booking.netPayoutAmount }];
+  if (booking.paymentStructure === "deposit_balance") {
+    const balance = calculateMarketplaceFees(booking.fee - booking.depositAmount, { currency: booking.currency, platformFeeRate: booking.platformFeeRate });
+    charges.push({ intentId: booking.balancePaymentIntentId!, amount: balance.artistPayoutAmount });
   }
 
-  const transfer = await stripe.transfers.create({
-    amount: toMinorUnits(booking.netPayoutAmount),
-    currency: booking.currency.toLowerCase(),
-    destination: musician.stripeConnectAccountId,
-    source_transaction: chargeId,
-    description: `Payout for booking ${booking.id}`,
-    metadata: { bookingId: booking.id },
-  });
+  const transfers: Stripe.Transfer[] = [];
+  for (const charge of charges) {
+    const paymentIntent = await stripe.paymentIntents.retrieve(charge.intentId);
+    const chargeId =
+      typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : paymentIntent.latest_charge?.id;
+    if (!chargeId) {
+      throw new PayoutReleaseError("Unable to locate the original charge for this booking.");
+    }
+    transfers.push(await stripe.transfers.create({
+      amount: toMinorUnits(charge.amount),
+      currency: booking.currency.toLowerCase(),
+      destination: musician.stripeConnectAccountId,
+      source_transaction: chargeId,
+      description: `Payout for booking ${booking.id}`,
+      metadata: { bookingId: booking.id },
+    }, { idempotencyKey: `payout-${booking.id}-${charge.intentId}` }));
+  }
+  const transfer = transfers[0];
+  const totalNet = charges.reduce((sum, c) => sum + c.amount, 0);
 
   await prisma.$transaction(async (tx) => {
     await tx.booking.update({ where: { id: booking.id }, data: { payoutStatus: "paid" } });
 
-    const transaction = await tx.marketplaceTransaction.findFirst({
-      where: { bookingId: booking.id, providerPaymentId: booking.stripePaymentIntentId! },
-    });
-
-    if (transaction) {
-      await tx.payout.create({
-        data: {
-          transactionId: transaction.id,
-          musicianId: musician.id,
-          providerPayoutId: transfer.id,
-          amount: booking.netPayoutAmount,
-          currency: booking.currency,
-          status: "paid",
-          paidAt: new Date(),
-        },
+    for (const [index, charge] of charges.entries()) {
+      const transaction = await tx.marketplaceTransaction.findFirst({
+        where: { bookingId: booking.id, providerPaymentId: charge.intentId },
       });
+      if (transaction) {
+        await tx.payout.create({
+          data: {
+            transactionId: transaction.id,
+            musicianId: musician.id,
+            providerPayoutId: transfers[index].id,
+            amount: charge.amount,
+            currency: booking.currency,
+            status: "paid",
+            paidAt: new Date(),
+          },
+        });
+      }
     }
   });
 
@@ -100,13 +120,13 @@ export async function releasePayoutForBooking(
     actorUserId: options.actorUserId,
     targetType: "Booking",
     targetId: booking.id,
-    metadata: { transferId: transfer.id, amount: booking.netPayoutAmount },
+    metadata: { transferId: transfer.id, transferIds: transfers.map((t) => t.id), amount: totalNet },
   });
 
   if (musician.user.email) {
     sendPayoutReleasedEmail(
       { email: musician.user.email, name: musician.stageName },
-      { venueName: booking.venue.venueName, amount: booking.netPayoutAmount, currency: booking.currency }
+      { venueName: booking.venue.venueName, amount: totalNet, currency: booking.currency }
     ).catch((err) => log.error({ err }, "Failed to send payout released email"));
   }
 

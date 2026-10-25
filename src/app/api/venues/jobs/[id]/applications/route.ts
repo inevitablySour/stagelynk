@@ -53,6 +53,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         id: a.id,
         jobListingId: a.jobListingId,
         coverMessage: a.coverMessage,
+        selectedPaymentStructure: a.selectedPaymentStructure,
+        proposedMilestones: a.proposedMilestones,
         proposedFee: a.proposedFee,
         availabilityNotes: a.availabilityNotes,
         availabilityConfirmed: a.availabilityConfirmed,

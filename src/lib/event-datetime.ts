@@ -11,3 +11,8 @@ export function combineEventDateAndEndTime(eventDate: Date, endTime: string): Da
   }
   return combined;
 }
+
+/** Same as combineEventDateAndEndTime, for the event's start. */
+export function combineEventDateAndStartTime(eventDate: Date, startTime: string): Date {
+  return combineEventDateAndEndTime(eventDate, startTime);
+}

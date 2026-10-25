@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { getLogger } from "@/lib/logger";
 import { writeAuditLog } from "@/lib/audit-log";
 import { getRequestMetadata } from "@/lib/request-context";
-import { refundCharge } from "@/lib/booking-escrow";
+import { refundBookingPayments } from "@/lib/booking-escrow";
 import { sendDisputeResolvedEmail } from "@/lib/email-templates";
 
 const log = getLogger("api-bookings-dispute-action");
@@ -61,19 +61,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const { resolution, refundAmount, resolutionNotes } = parsed.data;
 
-    if ((resolution === "resolved_refund_full" || resolution === "resolved_refund_partial") && !booking.stripePaymentIntentId) {
+    const charges = await prisma.marketplaceTransaction.findMany({
+      where: { bookingId: id, status: { in: ["paid", "partially_refunded"] }, providerPaymentId: { not: null } },
+      orderBy: { createdAt: "asc" },
+      select: { providerPaymentId: true, totalChargeAmount: true },
+    });
+    const totalPaid = Math.round(charges.reduce((sum, c) => sum + c.totalChargeAmount, 0) * 100) / 100;
+    if ((resolution === "resolved_refund_full" || resolution === "resolved_refund_partial") && charges.length === 0) {
       return NextResponse.json({ success: false, message: "No payment was recorded for this booking." }, { status: 400 });
     }
-    if (resolution === "resolved_refund_partial" && (!refundAmount || refundAmount <= 0 || refundAmount >= booking.totalChargeAmount)) {
+    if (resolution === "resolved_refund_partial" && (!refundAmount || refundAmount <= 0 || refundAmount >= totalPaid)) {
       return NextResponse.json({ success: false, message: "Provide a partial refund amount less than the total charge." }, { status: 400 });
     }
 
     let newPaymentStatus = booking.paymentStatus;
     if (resolution === "resolved_refund_full") {
-      await refundCharge(booking.stripePaymentIntentId!);
+      await refundBookingPayments(charges);
       newPaymentStatus = "refunded";
     } else if (resolution === "resolved_refund_partial") {
-      await refundCharge(booking.stripePaymentIntentId!, refundAmount);
+      await refundBookingPayments(charges, refundAmount);
       newPaymentStatus = "partially_refunded";
     }
 

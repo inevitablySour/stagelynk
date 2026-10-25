@@ -8,7 +8,8 @@ import { getLogger } from "@/lib/logger";
 import { writeAuditLog } from "@/lib/audit-log";
 import { getRequestMetadata } from "@/lib/request-context";
 import { placeHold, releaseHold, captureHold } from "@/lib/booking-escrow";
-import { combineEventDateAndEndTime } from "@/lib/event-datetime";
+import { combineEventDateAndEndTime, combineEventDateAndStartTime } from "@/lib/event-datetime";
+import { planPayment, balanceDueAt } from "@/lib/payment-structures";
 import {
   sendBookingAcceptedEmail,
   sendBookingDeclinedEmail,
@@ -64,13 +65,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const isMusician = session.user.role === "musician";
   const isNegotiated = booking.source === "direct_request";
   if (booking.source === "job_application") {
-    if (action !== "complete" || booking.paymentStatus !== "paid") {
+    if (action !== "complete" || (booking.paymentStatus !== "paid" && booking.paymentStructure !== "milestone")) {
       return NextResponse.json({ success: false, message: "Open-call payment decisions must be managed from the open-call applicant screen. Paid bookings cannot be cancelled without a refund-resolution flow." }, { status: 409 });
     }
     const application = booking.jobApplicationId ? await prisma.jobApplication.findUnique({ where: { id: booking.jobApplicationId }, include: { jobListing: true } }) : null;
     if (!application?.jobListing.eventEndsAt || application.jobListing.eventEndsAt > new Date()) {
       return NextResponse.json({ success: false, message: "The event must end before it can be marked complete." }, { status: 400 });
     }
+  }
+
+  if (action === "complete" && booking.paymentStructure === "deposit_balance" && !booking.balanceChargedAt) {
+    return NextResponse.json({ success: false, message: "The balance payment hasn't gone through yet, so this booking can't be completed." }, { status: 409 });
   }
 
   if (isNegotiated) {
@@ -301,6 +306,9 @@ async function captureAndConfirm(
   }
 
   const agreedFee = booking.proposedFee ?? booking.fee;
+  // A countered fee keeps the same deposit share as the original request.
+  const depositPercent = booking.fee > 0 ? Math.round((booking.depositAmount / booking.fee) * 100) : undefined;
+  const plan = planPayment({ structure: booking.paymentStructure, fee: agreedFee, currency: booking.currency, depositPercent });
 
   if (booking.stripePaymentIntentId) {
     await releaseHold(booking.stripePaymentIntentId);
@@ -312,7 +320,7 @@ async function captureAndConfirm(
     const result = await placeHold({
       customerId: booking.stripeCustomerId,
       paymentMethodId: booking.stripePaymentMethodId,
-      fee: agreedFee,
+      fee: plan.firstChargeFee,
       currency: booking.currency,
     });
     paymentIntent = result.paymentIntent;
@@ -361,6 +369,8 @@ async function captureAndConfirm(
         negotiationStatus: "none",
         proposedByUserId: null,
         fee: agreedFee,
+        depositAmount: booking.paymentStructure === "deposit_balance" ? plan.firstChargeFee : booking.depositAmount,
+        balanceDueAt: booking.paymentStructure === "deposit_balance" ? balanceDueAt(combineEventDateAndStartTime(booking.eventDate, booking.startTime)) : null,
         platformFeeRate: fees.platformFeeRate,
         platformFeeAmount: fees.platformFeeAmount,
         processorFeeEstimate: fees.processorFeeEstimate,
@@ -377,7 +387,8 @@ async function captureAndConfirm(
         bookingId: id,
         provider: "stripe",
         providerPaymentId: paymentIntent.id,
-        performanceFee: agreedFee,
+        transactionType: booking.paymentStructure === "deposit_balance" ? "deposit" : "full",
+        performanceFee: plan.firstChargeFee,
         platformFeeRate: fees.platformFeeRate,
         platformFeeAmount: fees.platformFeeAmount,
         processorFeeEstimate: fees.processorFeeEstimate,

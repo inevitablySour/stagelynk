@@ -7,6 +7,8 @@ import { OpenCallFeed } from "@/components/jobs/open-call-feed";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ApplicantPaymentField, emptyMilestones, type MilestoneDraft } from "@/components/payments/payment-structure-fields";
+import type { PaymentStructure } from "@prisma/client";
 import { ArtistCallsBoard } from "@/components/dashboard/artist-calls-board";
 import type { ArtistCallRow } from "@/lib/artist-calls";
 
@@ -32,6 +34,8 @@ export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee, artistCall
   const [applied, setApplied] = useState<string[]>(appliedJobIds);
   const [selectedJob, setSelectedJob] = useState<PublicJobListing | null>(null);
   const [availabilityConfirmed, setAvailabilityConfirmed] = useState(false);
+  const [structure, setStructure] = useState<PaymentStructure>("full_sum");
+  const [milestones, setMilestones] = useState<MilestoneDraft[]>(emptyMilestones());
 
   const targetJob = selectedJob ?? jobs.find((j) => j.id === applyTarget);
   const openSlots = targetJob?.slots?.filter((s) => !s.filled && !s.reserved) ?? [];
@@ -50,6 +54,14 @@ export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee, artistCall
       setError("Please choose which slot you're applying for.");
       return;
     }
+    if (structure === "milestone") {
+      const parsedMilestones = milestones.map((m) => ({ label: m.label.trim(), amount: Number(m.amount) }));
+      const sum = Math.round(parsedMilestones.reduce((total, m) => total + m.amount, 0) * 100) / 100;
+      if (parsedMilestones.some((m) => !m.label || !(m.amount > 0)) || Math.abs(sum - Number(proposedFee)) > 0.005) {
+        setError("Name every milestone and make the amounts add up to your fee.");
+        return;
+      }
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -61,6 +73,8 @@ export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee, artistCall
           proposedFee: proposedFee ? Number(proposedFee) : undefined,
           slotId: slotId || undefined,
           availabilityConfirmed,
+          selectedPaymentStructure: structure,
+          milestones: structure === "milestone" ? milestones.map((m) => ({ label: m.label.trim(), amount: Number(m.amount) })) : undefined,
         }),
       });
       const json = await res.json();
@@ -133,6 +147,10 @@ export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee, artistCall
                 onChange={(e) => setProposedFee(e.target.value)}
               />
             </div>
+            <ApplicantPaymentField
+              offered={targetJob?.offeredPaymentStructures ?? ["full_sum"]} selected={structure} onSelect={setStructure}
+              fee={Number(proposedFee) || 0} milestones={milestones} onMilestones={setMilestones} depositPercent={targetJob?.depositPercent ?? 30}
+            />
             <textarea
               className="min-h-24 w-full rounded-lg border border-stone-300 bg-sand-50 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-olive-500"
               aria-label="Optional cover message"
@@ -162,6 +180,7 @@ export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee, artistCall
         onApply={(id, job) => {
           const call = job ?? jobs.find((entry) => entry.id === id);
           setSelectedJob(call ?? null); setApplyTarget(id); setError(""); setCoverMessage(""); setAvailabilityConfirmed(false);
+          setStructure(call?.offeredPaymentStructures?.[0] ?? "full_sum"); setMilestones(emptyMilestones());
           const available = call?.slots?.filter((slot) => !slot.filled && !slot.reserved) ?? [];
           setSlotId(available.length === 1 ? available[0].id : "");
           setProposedFee(String(quotedFee ?? available[0]?.budgetMin ?? call?.budgetMin ?? ""));
