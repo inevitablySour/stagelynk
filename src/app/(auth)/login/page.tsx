@@ -62,7 +62,8 @@ export default function LoginPage() {
 
       const sessionResponse = await fetch("/api/auth/session");
       const session = await sessionResponse.json();
-      router.push(session?.user?.role === "venue" ? "/venue" : "/musician");
+      const role = session?.user?.role;
+      router.push(role === "admin" ? "/admin/equipment" : role === "venue" ? "/venue" : "/musician");
       router.refresh();
     } catch {
       setError("Unable to sign in right now.");

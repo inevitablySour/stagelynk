@@ -6,6 +6,7 @@ import { OnboardingRoleForm } from "@/components/onboarding/onboarding-role-form
 export default async function OnboardingRolePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (session.user.role === "admin") redirect("/admin/equipment");
 
   const [musicianProfile, venueProfile] = await Promise.all([
     prisma.musicianProfile.findUnique({ where: { userId: session.user.id }, select: { id: true } }),

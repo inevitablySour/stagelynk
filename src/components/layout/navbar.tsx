@@ -7,6 +7,7 @@ import { LayoutDashboard, LogIn, LogOut, Menu, Music, Settings, UserPlus, X } fr
 import { Button } from "@/components/ui/button";
 import { APP_NAME, NAV_LINKS } from "@/config";
 function getDashboardHref(role?: string | null) {
+  if (role === "admin") return "/admin/equipment";
   return role === "venue" ? "/venue" : "/musician";
 }
 

@@ -21,6 +21,10 @@ export async function POST(request: NextRequest) {
   if (!session?.user) {
     return NextResponse.json({ success: false, message: "Not signed in." }, { status: 401 });
   }
+  // Onboarding sets the role; letting an admin through would silently demote them.
+  if (session.user.role === "admin") {
+    return NextResponse.json({ success: false, message: "Admin accounts don't have a creative or client profile." }, { status: 403 });
+  }
 
   const requestMetadata = getRequestMetadataFromHeaders(request.headers);
 
