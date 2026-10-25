@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, Clock, ShieldCheck } from "lucide-react";
+import { CollaborateButton } from "@/components/artists/collaborate-button";
 import type { UserRole } from "@/types";
 
 export type BookingCardViewer = { role: UserRole; isOwner: boolean } | null;
@@ -26,7 +27,7 @@ export function BookingRequestCard({ musicianId, stageName, viewer }: BookingReq
     : state === "owner"
       ? { href: viewer?.role === "venue" ? "/venue/profile" : "/musician/profile", label: "Manage your profile" }
       : state === "creative"
-        ? { href: "/musician/jobs", label: "Browse open calls" }
+        ? { href: "/musician/p2p/discover", label: "Collaborate" }
         : state === "admin"
           ? { href: "/settings", label: "Account settings" }
           : { href: "/login", label: "Sign in to book" };
@@ -34,7 +35,7 @@ export function BookingRequestCard({ musicianId, stageName, viewer }: BookingReq
   return (
     <Card id="book" data-booking-state={state} className="scroll-mt-24 overflow-hidden border-brand/30 shadow-[0_16px_45px_-30px_rgba(47,59,29,0.5)]">
       <CardHeader>
-        <p className="eyebrow mb-2">{state === "owner" ? "Profile preview" : state === "creative" ? "Creative account" : state === "admin" ? "Administrator account" : "Make something happen"}</p>
+        <p className="eyebrow mb-2">{state === "owner" ? "Profile preview" : state === "creative" ? "Collaborate" : state === "admin" ? "Administrator account" : "Make something happen"}</p>
         <CardTitle className="break-words text-xl leading-tight">{state === "owner" ? "Your public profile" : `Work with ${stageName}`}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -42,14 +43,18 @@ export function BookingRequestCard({ musicianId, stageName, viewer }: BookingReq
           {state === "owner"
             ? "This is how clients see your profile. You cannot book yourself; update your details from your profile editor."
             : state === "creative"
-              ? "You're signed in as a creative. Direct booking requests are currently available to venue and client accounts, not creative accounts."
+              ? "Direct booking requests are for venue and client accounts. As a creative, you can match with this artist to collaborate directly, with no platform fee."
               : state === "admin"
                 ? "You're signed in as an administrator. Direct booking requests require a venue or client account."
                 : "A live set, a new project, a creative idea. Share the details and propose your fee."}
         </p>
-        <Button className="w-full" asChild>
-          <Link href={action.href}>{action.label}<ArrowUpRight className="ml-2 h-4 w-4" /></Link>
-        </Button>
+        {state === "creative" ? (
+          <CollaborateButton musicianId={musicianId} stageName={stageName} />
+        ) : (
+          <Button className="w-full" asChild>
+            <Link href={action.href}>{action.label}<ArrowUpRight className="ml-2 h-4 w-4" /></Link>
+          </Button>
+        )}
         {canBookOrSignIn && <div className="space-y-3 border-t border-line pt-4 text-xs leading-5 text-muted">
           <p className="flex items-start gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-brand" />The artist has 48 hours to respond.</p>
           <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" />A 5% platform fee is added to the agreed artist fee. Review the full breakdown before submitting.</p>

@@ -316,6 +316,8 @@ model MusicianProfile {
   credentials Credential[]
   availabilitySlots AvailabilitySlot[]
   conversationParticipants ConversationParticipant[]
+  artistOpenCalls          ArtistOpenCall[]
+  artistCallApplications   ArtistOpenCallApplication[]
   sentMessages             Message[]
   p2pQuestionnaireResponse P2PQuestionnaireResponse?
   p2pMatchesAsA            P2PMatch[] @relation("P2PMatchA")
@@ -1096,6 +1098,7 @@ model AuditLog {
 // ── P2P chat substrate (Phase 1) ─────────────────────────────
 enum ConversationKind {
   p2p_match
+  open_call
 }
 
 model Conversation {
@@ -1106,6 +1109,7 @@ model Conversation {
   participants ConversationParticipant[]
   messages     Message[]
   match        P2PMatch?
+  artistCallApplication ArtistOpenCallApplication?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1247,4 +1251,50 @@ model P2PMilestone {
   deal P2PDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@index([dealId])
+}
+
+// ── Artist-posted open calls ─────────────────────────────────
+enum ArtistCallDealType {
+  rate
+  milestone
+  split_credit
+}
+
+model ArtistOpenCall {
+  id          String             @id @default(cuid())
+  posterId    String
+  title       String
+  roleSlug    String
+  genreSlug   String?
+  timeline    String
+  dealType    ArtistCallDealType
+  dealDetails String             @default("")
+  description String             @default("") @db.Text
+  status      JobListingStatus   @default(published)
+
+  poster       MusicianProfile              @relation(fields: [posterId], references: [id], onDelete: Cascade)
+  applications ArtistOpenCallApplication[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([posterId])
+  @@index([status, createdAt])
+  @@index([roleSlug])
+}
+
+model ArtistOpenCallApplication {
+  id             String  @id @default(cuid())
+  callId         String
+  applicantId    String
+  conversationId String? @unique
+
+  call         ArtistOpenCall  @relation(fields: [callId], references: [id], onDelete: Cascade)
+  applicant    MusicianProfile @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  conversation Conversation?   @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([callId, applicantId])
+  @@index([applicantId])
 }

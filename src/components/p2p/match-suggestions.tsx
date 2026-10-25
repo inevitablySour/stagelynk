@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Heart, X, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +13,7 @@ interface Suggestion {
   stageName: string;
   profileImage: string | null;
   location: string;
+  roles: string[];
   genres: string[];
 }
 
@@ -70,7 +72,8 @@ export function MatchSuggestions() {
         {suggestions.map((s) => (
           <Card key={s.musicianId}>
             <CardContent className="p-5">
-              <h3 className="font-semibold text-stone-900">{s.stageName}</h3>
+              <h3 className="font-semibold text-stone-900"><Link href={`/artists/${s.musicianId}`} className="hover:text-brand hover:underline">{s.stageName}</Link></h3>
+              {s.roles.length > 0 && <p className="mt-1 text-sm text-stone-600">{s.roles.slice(0, 3).join(" · ")}</p>}
               {s.location && (
                 <p className="mt-1 flex items-center gap-1 text-sm text-stone-500">
                   <MapPin className="h-3.5 w-3.5" />
@@ -86,7 +89,8 @@ export function MatchSuggestions() {
                   ))}
                 </div>
               )}
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button variant="ghost" size="sm" asChild><Link href={`/artists/${s.musicianId}`}>View profile</Link></Button>
                 <Button
                   variant="outline"
                   size="sm"

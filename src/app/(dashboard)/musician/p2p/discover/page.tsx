@@ -18,8 +18,8 @@ export default async function P2PDiscoverPage() {
   const matches = await prisma.p2PMatch.findMany({
     where: { OR: [{ musicianAId: musician.id }, { musicianBId: musician.id }] },
     include: {
-      musicianA: { select: { id: true, stageName: true, profileImage: true } },
-      musicianB: { select: { id: true, stageName: true, profileImage: true } },
+      musicianA: { select: { id: true, stageName: true, profileImage: true, categoryPicks: { include: { subtype: true, instrumentType: true } } } },
+      musicianB: { select: { id: true, stageName: true, profileImage: true, categoryPicks: { include: { subtype: true, instrumentType: true } } } },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -29,7 +29,8 @@ export default async function P2PDiscoverPage() {
     return {
       id: m.id,
       status: m.status,
-      otherMusician: other,
+      otherMusician: { id: other.id, stageName: other.stageName, profileImage: other.profileImage },
+      roles: [...new Set(other.categoryPicks.map((pick) => pick.instrumentType?.name ?? pick.subtype.name))],
       isInitiator: m.initiatedBy === musician.id,
       conversationId: m.conversationId,
     };

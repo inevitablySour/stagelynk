@@ -12,6 +12,7 @@ export interface MatchRow {
   id: string;
   status: "pending" | "mutual" | "declined";
   otherMusician: { id: string; stageName: string; profileImage: string | null };
+  roles: string[];
   isInitiator: boolean;
   conversationId: string | null;
 }
@@ -53,7 +54,8 @@ export function MatchesList({ matches }: { matches: MatchRow[] }) {
         <Card key={m.id}>
           <CardContent className="flex items-center justify-between p-4">
             <div>
-              <p className="font-medium text-stone-900">{m.otherMusician.stageName}</p>
+              <p className="font-medium text-stone-900"><Link href={`/artists/${m.otherMusician.id}`} className="hover:text-brand hover:underline">{m.otherMusician.stageName}</Link></p>
+              {m.roles.length > 0 && <p className="mb-1 text-sm text-stone-600">{m.roles.slice(0, 3).join(" · ")}</p>}
               <Badge variant={m.status === "mutual" ? "success" : m.status === "declined" ? "destructive" : "warning"}>
                 {m.status === "pending" && m.isInitiator ? "Awaiting response" : m.status}
               </Badge>

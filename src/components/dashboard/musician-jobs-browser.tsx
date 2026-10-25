@@ -7,14 +7,21 @@ import { OpenCallFeed } from "@/components/jobs/open-call-feed";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ArtistCallsBoard } from "@/components/dashboard/artist-calls-board";
+import type { ArtistCallRow } from "@/lib/artist-calls";
 
 interface MusicianJobsBrowserProps {
   jobs: PublicJobListing[];
   appliedJobIds: string[];
   quotedFee?: number | null;
+  artistCalls?: ArtistCallRow[];
+  appliedArtistCallIds?: string[];
 }
 
-export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee }: MusicianJobsBrowserProps) {
+type Source = "venue" | "artist";
+
+export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee, artistCalls = [], appliedArtistCallIds = [] }: MusicianJobsBrowserProps) {
+  const [source, setSource] = useState<Source>("venue");
   const router = useRouter();
   const [applyTarget, setApplyTarget] = useState<string | null>(null);
   const [coverMessage, setCoverMessage] = useState("");
@@ -74,8 +81,20 @@ export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee }: Musician
     }
   };
 
+  const tabs: [Source, string][] = [["venue", "Venue & client calls"], ["artist", "Artist calls"]];
+
   return (
     <>
+      <div role="tablist" aria-label="Open call source" className="mb-5 inline-flex rounded-xl border border-line bg-surface p-1">
+        {tabs.map(([value, label]) => (
+          <button key={value} type="button" role="tab" aria-selected={source === value} onClick={() => setSource(value)}
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${source === value ? "bg-brand text-surface" : "text-muted hover:text-ink"}`}>
+            {label}{value === "artist" && artistCalls.length > 0 ? ` (${artistCalls.length})` : ""}
+          </button>
+        ))}
+      </div>
+      {source === "artist" && <ArtistCallsBoard initial={artistCalls} appliedIds={appliedArtistCallIds} />}
+      {source === "venue" && <>
       {applyTarget && (
         <Card className="mb-6 border-olive-200">
           <CardContent className="p-5 space-y-3">
@@ -155,6 +174,7 @@ export function MusicianJobsBrowser({ jobs, appliedJobIds, quotedFee }: Musician
           You&apos;ve applied to {jobs.filter((j) => applied.includes(j.id)).length} of the listings above.
         </p>
       )}
+    </>}
     </>
   );
 }

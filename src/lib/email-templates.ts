@@ -316,3 +316,24 @@ export async function sendAccountLinkedEmail(to: Recipient, provider: "github" |
     }),
   });
 }
+
+export async function sendArtistCallApplicationEmail(
+  to: Recipient,
+  details: { applicantName: string; callTitle: string }
+) {
+  await sendEmail({
+    from: { email: MAIL_FROM.noreply, name: APP_NAME },
+    to: [to],
+    subject: `${details.applicantName} applied to "${details.callTitle}"`,
+    text: `${details.applicantName} applied to your open call "${details.callTitle}" with their profile. A chat thread is waiting in your messages.`,
+    html: renderEmailHtml({
+      heading: "New applicant on your open call",
+      bodyHtml: `<p><strong>${escapeHtml(details.applicantName)}</strong> applied to your open call <strong>"${escapeHtml(details.callTitle)}"</strong> with their profile attached. A chat thread is waiting in your messages.</p>`,
+      button: { label: "Open messages", url: appUrl("/musician/p2p/messages") },
+    }),
+  });
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}

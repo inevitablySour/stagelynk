@@ -72,7 +72,7 @@ export default async function P2PMessagesPage({
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-stone-900">Messages</h1>
-            <p className="mt-1 text-stone-500">Chat with artists you&apos;ve matched with.</p>
+            <p className="mt-1 text-stone-500">Chat with artists you&apos;ve matched with, and with applicants and posters of open calls.</p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-4">

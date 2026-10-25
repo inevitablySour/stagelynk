@@ -10,6 +10,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { BookingStatus } from "@/types";
 import Link from "next/link";
+import { BookingCalendar } from "@/components/calendar/booking-calendar";
 
 const BOOKING_BADGE_VARIANT: Record<BookingStatus, "success" | "warning" | "secondary" | "destructive"> = {
   pending: "warning",
@@ -134,6 +135,14 @@ export default async function VenueDashboard() {
               </Card>
             </div>
           </div>
+
+          <Card id="calendar" className="panel-soft mt-6 scroll-mt-6">
+            <CardHeader>
+              <CardTitle>Calendar</CardTitle>
+              <p className="text-sm text-stone-500">Your bookings, project due dates and availability in one view.</p>
+            </CardHeader>
+            <CardContent><BookingCalendar role="venue" /></CardContent>
+          </Card>
         </div>
       </div>
     </div>

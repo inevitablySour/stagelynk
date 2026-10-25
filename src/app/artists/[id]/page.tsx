@@ -108,7 +108,7 @@ export default async function ArtistProfilePage({ params }: { params: Promise<{ 
                   )}
                 </div>
                 <div className="flex shrink-0 flex-col gap-2 lg:pt-5">
-                  <Button size="lg" asChild><Link href={viewer?.isOwner ? (viewer.role === "venue" ? "/venue/profile" : "/musician/profile") : "#book"}>{viewer?.isOwner ? "Manage your profile" : viewer && viewer.role !== "venue" ? "Booking information" : "Request a booking"}<ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button>
+                  <Button size="lg" asChild><Link href={viewer?.isOwner ? (viewer.role === "venue" ? "/venue/profile" : "/musician/profile") : "#book"}>{viewer?.isOwner ? "Manage your profile" : viewer?.role === "musician" ? "Match to collaborate" : viewer && viewer.role !== "venue" ? "Booking information" : "Request a booking"}<ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button>
                   <p className="text-center text-xs text-muted">Share your idea. Find your creative fit.</p>
                 </div>
               </div>

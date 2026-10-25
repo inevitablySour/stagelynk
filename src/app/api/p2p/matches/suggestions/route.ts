@@ -28,6 +28,7 @@ export async function GET() {
       where: { id: { not: me.id }, user: { deletedAt: null } },
       include: {
         genrePicks: { include: { subtype: true } },
+        categoryPicks: { include: { subtype: true, instrumentType: true } },
         p2pQuestionnaireResponse: true,
       },
       take: 100,
@@ -62,6 +63,7 @@ export async function GET() {
       stageName: profile.stageName,
       profileImage: profile.profileImage,
       location: profile.location,
+      roles: [...new Set(profile.categoryPicks.map((pick) => pick.instrumentType?.name ?? pick.subtype.name))],
       genres: profile.genrePicks.map((pick) => pick.customLabel ?? pick.subtype.name),
       fit: { equipmentFit: r.equipmentFit, genreFit: r.genreFit, questionnaireFit: r.questionnaireFit },
     };
